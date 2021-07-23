@@ -3,9 +3,8 @@
 % TODOs
 % layout character
 % import export in module must be same name
-% local_part can only be "MODULE" if there ist no export_part
 % module_name cannot be in forbidden_module_name
-% local_part can only have lift_decl if there is an export_part
+% No Module may depend upon itself.
 
 % DCG-Grammar
 
@@ -232,29 +231,36 @@ ordinary_char --> "}".
 program --> goedel_module, opt_goedel_module.
 opt_goedel_module --> goedel_module, opt_goedel_module.
 opt_goedel_module --> "".
-goedel_module --> export_part, local_part. % names of parts must be the same %%TODO
+goedel_module --> export_part, local_local_part. % names of parts must be the same %%TODO
 goedel_module --> export_part.
-goedel_module --> local_part.
+goedel_module --> module_local_part.
 export_part --> export_kind, module_name, terminator, opt_export_item.
-local_part --> local_kind, module_name, terminator, opt_local_item.
+% local is splitted into module parts (has no export part)
+% and local parts (has export part)
+% local_part --> local_kind, module_name, terminator, opt_local_item.
+local_local_part --> "LOCAL", module_name, terminator, opt_local_local_item.
+module_local_part --> "MODULE", module_name, terminator, opt_module_local_item.
 export_kind --> "EXPORT".
 % only system module can have export_kind "CLOSED"
 % export_kind --> "CLOSED".
-local_kind --> "LOCAL".
-local_kind --> "MODULE". % only if there is no export_part %%TODO
+opt_module_names --> comma, module_name, opt_module_names.
+opt_module_names --> "".
 module_name --> user_big_name. % cannot be in forbidden_module_names %%TODO
 opt_export_item --> export_item, opt_export_item.
 opt_export_item --> "".
 export_item --> import_decl, terminator.
 export_item --> language_decl, terminator.
 export_item --> control_decl, terminator.
-opt_local_item --> import_decl, terminator.
-opt_local_item --> lift_decl, terminator.
-opt_local_item --> language_decl, terminator.
-opt_local_item --> control_decl, terminator.
-opt_local_item --> statement, terminator.
-opt_module_names --> module_name, opt_module_names.
-opt_module_names --> "".
+opt_module_local_item --> module_local_item, opt_module_local_item.
+opt_module_local_item --> "".
+module_local_item --> import_decl, terminator.
+module_local_item --> language_decl, terminator.
+module_local_item --> control_decl, terminator.
+module_local_item --> statement, terminator.
+opt_local_local_item --> local_local_item, opt_local_local_item.
+opt_local_local_item --> "".
+local_local_item --> module_local_item.
+local_local_item --> lift_decl, terminator.
 import_decl --> "IMPORT", module_name, opt_module_names.
-lift_decl --> "LIFT", module_name, opt_module_names. % only if module has export part %%TODO
+lift_decl --> "LIFT", module_name, opt_module_names. % only if module has export part
 % No Module may depend upon itself. %%TODO
