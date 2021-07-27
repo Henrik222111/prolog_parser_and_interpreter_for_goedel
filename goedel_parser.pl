@@ -345,3 +345,22 @@ type_seq(N) --> type, opt_constr_types(1,N).
 base --> user_name. % symbol with this name has to be declared or imported as base
 constructor(N) --> user_name. % symbol with this name has to be declared or imported as constructor
 parameter --> little_name.
+
+% Control Declarations
+control_decl --> "DELAY", cont_decl, opt_cont_decls. % only in module where predicate is declared
+opt_cont_decls --> cont_decl, opt_cont_decls.
+opt_cont_decls --> "".
+% atom cannot be a proposition, no atom pair in delay set can have a
+% common instance
+cont_decl --> goedel_atom, "UNTIL", cond.
+cond --> cond1.
+cond --> cond1, "&", and_seq.
+cond --> cond1, "\\/", or_seq.
+cond1 --> "NONVAR", "(", variable, ")".
+cond1 --> "GROUND", "(", varaible, ")".
+cond1 --> "true".
+cond1 --> "(", cond, ")".
+and_seq --> cond1, "&", and_seq.
+and_seq --> cond1.
+or_seq --> cond1, "\\/", or_seq.
+or_seq --> cond1.
