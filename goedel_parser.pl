@@ -6,8 +6,7 @@
 % module_name cannot be in forbidden_module_name
 % No Module may depend upon itself.
 % integer and float constant is treated specially (const_decl)
-% func_decl
-% pred_decl
+% func_decl declaration must be transparent
 % user_big_name cannot be in forbidden_big_name
 % user_graphic_name cannot be in forbidden_graphic_name
 
@@ -291,7 +290,7 @@ language_decl --> proposition_decl.
 language_decl --> predicate_decl.
 base_decl --> "BASE", user_name_seq.
 constructor_decl --> "CONSTRUCTOR", constr_decl, opt_constr_decls.
-opt_constr_decls --> comma, constr_decls, opt_constr_decls.
+opt_constr_decls --> comma, constr_decl, opt_constr_decls.
 opt_constr_decls --> "".
 constr_decl --> user_name, "/", positive_number.
 constant_decl --> "CONSTANT", const_decl, opt_const_decl.
@@ -301,12 +300,32 @@ const_decl --> user_name_seq, ":", type. %integer and float constant is treated 
 function_decl --> "FUNCTION", func_decl, opt_func_decls.
 opt_func_decls --> semicolon, func_decl, opt_func_decls.
 opt_func_decls --> "".
-% func_decl %%TODO
+% declaration must be transparent %%TODO
+func_decl --> user_name_seq,
+    ":", function_spec_1, "(", positive_number, ")",
+    ":", type, "->", type.
+func_decl --> user_name_seq,
+    ":", function_spec_2, "(", positive_number, ")",
+    ":", type, "*", type, "->", type.
+func_decl --> user_name_seq, ":", type, opt_types, "->", type.
+opt_types --> "*", type, opt_types.
+function_spec_1 --> "Fx".
+function_spec_1 --> "Fy".
+function_spec_1 --> "xF".
+function_spec_1 --> "yF".
+function_spec_2 --> "xFx".
+function_spec_2 --> "xFy".
+function_spec_2 --> "yFx".
 proposition_decl --> "PROPOSITION", user_name_seq.
 predicate_decl --> "PREDICATE", pred_decl, opt_pred_decls.
-opt_pred_decls --> semicolon, pred_decls, opt_pred_decls.
+opt_pred_decls --> semicolon, pred_decl, opt_pred_decls.
 opt_pred_decls --> "".
-% pred_decl %%TODO
+pred_decl --> user_name_seq, ":", predicate_spec_1, ":", type.
+pred_decl --> user_name_seq, ":", predicate_spec_2, ":", type, "*", type.
+pred_decl --> user_name_seq, ":", type, opt_types.
+predicate_spec_1 --> "Pz".
+predicate_spec_1 --> "zP".
+predicate_spec_2 --> "zPz".
 user_name_seq --> user_name, opt_user_names.
 opt_user_names --> comma, user_name, opt_user_names.
 opt_user_names --> "".
