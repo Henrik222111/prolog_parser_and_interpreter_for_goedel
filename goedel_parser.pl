@@ -307,8 +307,7 @@ func_decl --> user_name_seq,
 func_decl --> user_name_seq,
     ":", function_spec_2, "(", positive_number, ")",
     ":", type, "*", type, "->", type.
-func_decl --> user_name_seq, ":", type, opt_types, "->", type.
-opt_types --> "*", type, opt_types.
+func_decl --> user_name_seq, ":", type, opt_func_types, "->", type.
 function_spec_1 --> "Fx".
 function_spec_1 --> "Fy".
 function_spec_1 --> "xF".
@@ -322,7 +321,7 @@ opt_pred_decls --> semicolon, pred_decl, opt_pred_decls.
 opt_pred_decls --> "".
 pred_decl --> user_name_seq, ":", predicate_spec_1, ":", type.
 pred_decl --> user_name_seq, ":", predicate_spec_2, ":", type, "*", type.
-pred_decl --> user_name_seq, ":", type, opt_types.
+pred_decl --> user_name_seq, ":", type, opt_func_types.
 predicate_spec_1 --> "Pz".
 predicate_spec_1 --> "zP".
 predicate_spec_2 --> "zPz".
@@ -333,3 +332,16 @@ user_name --> user_big_name.
 user_name --> user_graphic_name.
 user_big_name --> big_name. % cannot be in forbidden_big_names %%TODO
 user_graphic_name --> graphic_name. % cannot be in forbidden_graphic_names %%TODO
+
+% Types
+opt_func_types --> "*", type, opt_func_types.
+opt_func_types --> "".
+opt_constr_types(C,N) --> type, {C1 is C+1}, opt_constr_types(C1,N).
+opt_constr_types(N,N) --> "".
+type --> parameter.
+type --> base.
+type --> constructor(N), "(", type_seq(N), ")".
+type_seq(N) --> type, opt_constr_types(1,N).
+base --> user_name. % symbol with this name has to be declared or imported as base
+constructor(N) --> user_name. % symbol with this name has to be declared or imported as constructor
+parameter --> little_name.
