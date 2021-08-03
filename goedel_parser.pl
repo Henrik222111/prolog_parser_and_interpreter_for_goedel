@@ -50,21 +50,23 @@ little_name --> little_letter, opt_name_character.
 graphic_name --> graphic_character, opt_graphic_character.
 string --> "\"", opt_string_character, "\"".
 bracket --> "{".
-bracket --> "}_", label.
-bracket --> "}".
+bracket --> "}", bracket_label.
 bracket --> "(".
 bracket --> ")".
 bracket --> "[".
 bracket --> "]".
+bracket_label --> "_", label.
+bracket_label --> "".
 comma --> ",".
 semicolon --> ";".
 underscore --> "_".
 terminator --> ".".
 number --> zero, opt_zero.
 number --> positive_number.
-float --> decimal, "E+", number.
-float --> decimal, "E-", number.
-float --> decimal.
+float --> decimal, float_exp.
+float_exp --> "E+", number.
+float_exp --> "E-", number.
+float_exp --> "".
 decimal --> number, ".", number.
 label --> positive_number.
 opt_name_character --> name_character, opt_name_character.
@@ -301,13 +303,12 @@ function_decl --> "FUNCTION", func_decl, opt_func_decls.
 opt_func_decls --> semicolon, func_decl, opt_func_decls.
 opt_func_decls --> "".
 % declaration must be transparent %%TODO
-func_decl --> user_name_seq,
-    ":", function_spec_1, "(", positive_number, ")",
+func_decl --> user_name_seq, ":", func_decl_end.
+func_decl_end --> function_spec_1, "(", positive_number, ")",
     ":", type, "->", type.
-func_decl --> user_name_seq,
-    ":", function_spec_2, "(", positive_number, ")",
+func_decl_end --> function_spec_2, "(", positive_number, ")",
     ":", type, "*", type, "->", type.
-func_decl --> user_name_seq, ":", type, opt_func_types, "->", type.
+func_decl_end --> type, opt_func_types, "->", type.
 function_spec_1 --> "Fx".
 function_spec_1 --> "Fy".
 function_spec_1 --> "xF".
@@ -319,9 +320,10 @@ proposition_decl --> "PROPOSITION", user_name_seq.
 predicate_decl --> "PREDICATE", pred_decl, opt_pred_decls.
 opt_pred_decls --> semicolon, pred_decl, opt_pred_decls.
 opt_pred_decls --> "".
-pred_decl --> user_name_seq, ":", predicate_spec_1, ":", type.
-pred_decl --> user_name_seq, ":", predicate_spec_2, ":", type, "*", type.
-pred_decl --> user_name_seq, ":", type, opt_func_types.
+pred_decl --> user_name_seq, ":", pred_decl_end.
+pred_decl_end --> predicate_spec_1, ":", type.
+pred_decl_end --> predicate_spec_2, ":", type, "*", type.
+pred_decl_end --> type, opt_func_types.
 predicate_spec_1 --> "Pz".
 predicate_spec_1 --> "zP".
 predicate_spec_2 --> "zPz".
@@ -353,14 +355,17 @@ opt_cont_decls --> "".
 % atom cannot be a proposition, no atom pair in delay set can have a
 % common instance
 cont_decl --> goedel_atom, "UNTIL", cond.
-cond --> cond1.
-cond --> cond1, "&", and_seq.
-cond --> cond1, "\\/", or_seq.
+cond --> cond1, cond_end.
+cond_end --> "&", and_seq.
+cond_end --> "\\/", or_seq.
+cond_end --> "".
 cond1 --> "NONVAR", "(", variable, ")".
 cond1 --> "GROUND", "(", varaible, ")".
 cond1 --> "true".
 cond1 --> "(", cond, ")".
-and_seq --> cond1, "&", and_seq.
-and_seq --> cond1.
-or_seq --> cond1, "\\/", or_seq.
-or_seq --> cond1.
+and_seq --> cond1, and_seq_end.
+and_seq_end --> "&", and_seq.
+and_seq_end --> "".
+or_seq --> cond1, or_seq_end.
+or_seq_end --> "\\/", or_seq.
+or_seq_end --> "".
