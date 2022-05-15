@@ -338,7 +338,7 @@ user_graphic_name --> graphic_name. % cannot be in forbidden_graphic_names %%TOD
 % Types
 opt_func_types --> "*", type, opt_func_types.
 opt_func_types --> "".
-opt_constr_types(C,N) --> type, {C1 is C+1}, opt_constr_types(C1,N).
+opt_constr_types(C,N) --> comma, type, {C1 is C+1}, opt_constr_types(C1,N).
 opt_constr_types(N,N) --> "".
 type --> parameter.
 type --> base.
@@ -360,7 +360,7 @@ cond_end --> "&", and_seq.
 cond_end --> "\\/", or_seq.
 cond_end --> "".
 cond1 --> "NONVAR", "(", variable, ")".
-cond1 --> "GROUND", "(", varaible, ")".
+cond1 --> "GROUND", "(", variable, ")".
 cond1 --> "true".
 cond1 --> "(", cond, ")".
 and_seq --> cond1, and_seq_end.
@@ -369,3 +369,145 @@ and_seq_end --> "".
 or_seq --> cond1, or_seq_end.
 or_seq_end --> "\\/", or_seq.
 or_seq_end --> "".
+
+% Statements
+statement --> goedel_atom, statement_end.
+statement_end --> "<-", body.
+statement_end --> "".
+body --> "|", body_end.
+body --> cformula_0, body_mid.
+body --> cformula_2, body_mid.
+body --> cformula_f, body_mid.
+body_mid --> "|", body_end.
+body_mid --> "".
+body_end --> cformula_0.
+body_end --> cformula_2.
+body_end --> cformula_f.
+body_end --> "".
+cformula_0 --> "(", cformula_0_f, ")".
+cformula_0 --> "{", cformula_0_f, "}", cformula_0_end.
+cformula_0_end --> "_", label.
+cformula_0_end --> "".
+cformula_0_f --> cformula_0.
+cformula_0_f --> cformula_2.
+cformula_0_f --> cformula_f.
+cformula_2 --> cformula_0, "&", cformula_2_end.
+cformula_2 --> formula_0, "&", cformula_2_end.
+cformula_2 --> formula_1, "&", cformula_2_end.
+cformula_2_end --> cformula_0.
+cformula_2_end --> cformula_2.
+cformula_2_end --> formula_0.
+cformula_2_end --> formula_1.
+cformula_2_end --> formula_2.
+cformula_f --> formula_0.
+cformula_f --> formula_1.
+cformula_f --> formula_2.
+cformula_f --> formula_3.
+cformula_f --> formula_4.
+formula_f --> formula_0.
+formula_f --> formula_1.
+formula_f --> formula_2.
+formula_f --> formula_3.
+formula_f --> formula_4.
+formula_0 --> goedel_atom.
+formula_0 --> range_formula.
+formula_0 --> "(", formula_f, ")".
+formula_1 --> "~", formula_1_end.
+formula_1 --> "SOME", "[", variable_seq, "]", formula_1_end.
+formula_1 --> "ALL", "[", variable_seq, "]", formula_1_end.
+formula_1_end --> formula_0.
+formula_1_end --> formula_1.
+formula_2 --> formula_0, "&", formula_2_f1_end.
+formula_2 --> formula_1, "&", formula_2_f1_end.
+formula_2 --> "IF", formula_2_if_end.
+formula_2 --> "THEN", then_part, formula_2_then_end.
+formula_2_f1_end --> formula_0.
+formula_2_f1_end --> formula_1.
+formula_2_f1_end --> formula_2.
+formula_2_if_end --> "SOME", "[", variable_seq, "]", formula_f.
+formula_2_if_end --> formula_f.
+formula_2_then_end --> "ELSE", formula_2_f1_end.
+formula_2_then_end --> "".
+formula_3 --> formula_0, "\\/", formula_3_end.
+formula_3 --> formula_1, "\\/", formula_3_end.
+formula_3 --> formula_2, "\\/", formula_3_end.
+formula_3_end --> formula_0.
+formula_3_end --> formula_1.
+formula_3_end --> formula_2.
+formula_3_end --> formula_3.
+formula_4 --> formula_0, formula_4_mid.
+formula_4 --> formula_1, formula_4_mid.
+formula_4 --> formula_2, formula_4_mid.
+formula_4 --> formula_3, formula_4_mid.
+formula_4_mid --> "<-", formula_f.
+formula_4_mid --> "->", formula_f.
+formula_4_mid --> "<->", formula_4_end.
+formula_4_end --> formula_0.
+formula_4_end --> formula_1.
+formula_4_end --> formula_2.
+formula_4_end --> formula_3.
+then_part --> "IF", formula_f, "THEN", then_part.
+then_part --> formula_0, then_part_end.
+then_part --> formula_1, then_part_end.
+then_part_end --> "&", then_part.
+then_part_end --> "".
+goedel_atom --> proposition.
+goedel_atom --> predicate_no_ind, "(", term, opt_terms(1,N), ")".
+goedel_atom --> predicate_ind, term.
+goedel_atom --> term, predicate_ind, goedel_atom_end.
+goedel_atom_end --> term.
+goedel_atom_end --> "".
+range_formula --> term, comperator, term, comperator, term.
+comperator --> "<".
+comperator --> "=<".
+term --> term_inf.
+term --> term_p.
+term_inf --> variable.
+term_inf --> constant.
+term_inf --> number.
+term_inf --> float.
+term_inf --> string.
+term_inf --> list.
+term_inf --> set.
+term_inf --> "(", term, ")".
+term_inf --> function_no_ind, "(", term, opt_terms(1,N), ")".
+opt_terms(C,N) --> comma, term, {C1 is C+1}, opt_terms(C1,N).
+opt_terms(N,N) --> "".
+term_p --> function_ind, term_p. %Fx and Fy
+%TODO
+%term_p with left recursion
+%TODO
+%must be arrity N and imported or declared
+%indicators have Prio p
+constant --> user_name.
+function_ind --> user_name.
+function_no_ind --> user_name.
+proposition --> user_name.
+predicate_ind --> user_name.
+predicate_no_ind --> user_name.
+list --> "[", list_mid, "]".
+list_mid --> list_expr.
+list_mid --> "".
+list_expr --> term, list_expr_mid.
+list_expr_mid --> comma, list_expr.
+list_expr_mid --> "|", list_expr_end.
+list_expr_mid --> "".
+list_expr_end --> list.
+list_expr_end --> variable.
+set --> "{", set_mid, "}".
+set_mid --> term, ":", formula_f.
+set_mid --> set_expr.
+set_mid --> "".
+set_expr --> term, set_expr_mid.
+set_expr_mid --> comma, set_expr.
+set_expr_mid --> "|", set_expr_end.
+set_expr_mid --> "".
+set_expr_end --> set.
+set_expr_end --> variable.
+variable_seq --> little_name, variable_seq_opt.
+variable_seq_opt --> comma, little_name, variable_seq_opt.
+variable_seq_opt --> "".
+variable --> underscore, variable_end.
+variable --> little_name.
+variable_end --> little_name.
+variable_end --> "".
