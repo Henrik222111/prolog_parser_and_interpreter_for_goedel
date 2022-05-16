@@ -10,6 +10,24 @@
 % user_big_name cannot be in forbidden_big_name
 % user_graphic_name cannot be in forbidden_graphic_name
 
+parse_file(File) :-
+    format('Parsing Gödel file: ~w~n', [File]),
+    see(File),
+    read_file(Txt),
+    seen,
+    reset_line_count, trace,
+    program(Txt,[]),
+    format('end '), print_line_count.
+parse_file(_File) :-
+    format('fail '), print_line_count.
+
+read_file(Txt) :-
+    get_code(CharCode),
+    (CharCode<0 -> Txt=[]
+     ; (Txt = [CharCode|T],
+       read_file(T)
+       )
+    ).
 
 % DCG-Grammar
 
@@ -178,14 +196,15 @@ string_character --> "\\", non_esc_character.
 string_character --> non_esc_character.
 layout_item --> layout_character.
 layout_item --> comment.
-layout_character --> " ".
-layout_character --> "\t".
-layout_character --> "\r".
-layout_character --> "\n". %%TODO
+layout_character --> " ", !.
+layout_character --> "\t", !.
+layout_character --> "\r", !, {increment_line_count}.
+layout_character --> "\n", !, {increment_line_count}.
 comment_layout_character --> " ".
 comment_layout_character --> "\t".
-comment --> "%", opt_comment_character, "\r".
-comment --> "%", opt_comment_character, "\n".
+comment --> "%", opt_comment_character, comment_end.
+comment_end --> "\r", !, {increment_line_count}.
+comment_end --> "\n", !, {increment_line_count}.
 opt_comment_character --> comment_character, opt_comment_character.
 opt_comment_character --> "".
 % splited into comment_character, non_rsqm_character, non_dqm_character
@@ -246,41 +265,41 @@ ordinary_char --> "{".
 ordinary_char --> "}".
 
 % Programs
-program --> goedel_module, opt_goedel_module.
-opt_goedel_module --> goedel_module, opt_goedel_module.
+program --> goedel_module, !, opt_goedel_module.
+opt_goedel_module --> goedel_module, !, opt_goedel_module.
 opt_goedel_module --> "".
 goedel_module --> export_part, local_local_part. % names of parts must be the same %%TODO
 goedel_module --> export_part.
 goedel_module --> module_local_part.
-export_part --> export_kind, module_name, terminator, opt_export_item.
+export_part --> export_kind, ws, module_name, optws, terminator, optws, opt_export_item.
 % local is splitted into module parts (has no export part)
 % and local parts (has export part)
 % local_part --> local_kind, module_name, terminator, opt_local_item.
-local_local_part --> "LOCAL", module_name, terminator, opt_local_local_item.
-module_local_part --> "MODULE", module_name, terminator, opt_module_local_item.
+local_local_part --> "LOCAL", ws, module_name, optws, terminator, optws, opt_local_local_item.
+module_local_part --> "MODULE", ws, module_name, optws, terminator, optws, opt_module_local_item.
 export_kind --> "EXPORT".
 % only system module can have export_kind "CLOSED"
 % export_kind --> "CLOSED".
-opt_module_names --> comma, module_name, opt_module_names.
+opt_module_names --> comma, optws, module_name, opt_module_names.
 opt_module_names --> "".
 module_name --> user_big_name. % cannot be in forbidden_module_names %%TODO
-opt_export_item --> export_item, opt_export_item.
+opt_export_item --> export_item, optws, opt_export_item.
 opt_export_item --> "".
-export_item --> import_decl, terminator.
-export_item --> language_decl, terminator.
-export_item --> control_decl, terminator.
-opt_module_local_item --> module_local_item, opt_module_local_item.
+export_item --> import_decl, optws, terminator, optws.
+export_item --> language_decl, optws, terminator, optws.
+export_item --> control_decl, optws, terminator, optws.
+opt_module_local_item --> module_local_item, optws, opt_module_local_item.
 opt_module_local_item --> "".
-module_local_item --> import_decl, terminator.
-module_local_item --> language_decl, terminator.
-module_local_item --> control_decl, terminator.
-module_local_item --> statement, terminator.
-opt_local_local_item --> local_local_item, opt_local_local_item.
+module_local_item --> import_decl, optws, terminator, optws.
+module_local_item --> language_decl, optws, terminator, optws.
+module_local_item --> control_decl, optws, terminator, optws.
+module_local_item --> statement, optws, terminator, optws.
+opt_local_local_item --> local_local_item, optws, opt_local_local_item.
 opt_local_local_item --> "".
 local_local_item --> module_local_item.
-local_local_item --> lift_decl, terminator.
-import_decl --> "IMPORT", module_name, opt_module_names.
-lift_decl --> "LIFT", module_name, opt_module_names. % only if module has export part
+local_local_item --> lift_decl, optws, terminator, optws.
+import_decl --> "IMPORT", ws,  module_name, optws, opt_module_names.
+lift_decl --> "LIFT", ws, module_name, optws, opt_module_names. % only if module has export part
 % No Module may depend upon itself. %%TODO
 
 % Language Declarations
@@ -290,25 +309,27 @@ language_decl --> constant_decl.
 language_decl --> function_decl.
 language_decl --> proposition_decl.
 language_decl --> predicate_decl.
-base_decl --> "BASE", user_name_seq.
-constructor_decl --> "CONSTRUCTOR", constr_decl, opt_constr_decls.
-opt_constr_decls --> comma, constr_decl, opt_constr_decls.
+base_decl --> "BASE", optws, user_name_seq.
+constructor_decl --> "CONSTRUCTOR", optws, constr_decl, optws, opt_constr_decls.
+opt_constr_decls --> comma, optws, constr_decl, optws, opt_constr_decls.
 opt_constr_decls --> "".
-constr_decl --> user_name, "/", positive_number.
-constant_decl --> "CONSTANT", const_decl, opt_const_decl.
-opt_const_decl --> semicolon, const_decl, opt_const_decl.
+constr_decl --> user_name, optws, "/", optws, positive_number, optws.
+constant_decl --> "CONSTANT", optws, const_decl, optws, opt_const_decl.
+opt_const_decl --> semicolon, optws, const_decl, optws, opt_const_decl.
 opt_const_decl --> "".
-const_decl --> user_name_seq, ":", type. %integer and float constant is treated specially %%TODO
-function_decl --> "FUNCTION", func_decl, opt_func_decls.
-opt_func_decls --> semicolon, func_decl, opt_func_decls.
+const_decl --> user_name_seq, ":", optws, type, optws. %integer and float constant is treated specially %%TODO
+function_decl --> "FUNCTION", ws, func_decl, optws, opt_func_decls.
+opt_func_decls --> semicolon, optws, func_decl, optws,  opt_func_decls.
 opt_func_decls --> "".
 % declaration must be transparent %%TODO
-func_decl --> user_name_seq, ":", func_decl_end.
-func_decl_end --> function_spec_1, "(", positive_number, ")",
-    ":", type, "->", type.
-func_decl_end --> function_spec_2, "(", positive_number, ")",
-    ":", type, "*", type, "->", type.
-func_decl_end --> type, opt_func_types, "->", type.
+func_decl --> user_name_seq,  ":", optws, func_decl_end.
+func_decl_end --> function_spec_1, optws, "(", optws, positive_number, optws, ")", optws,
+    ":", optws, type, optws, "->", optws, type, optws.
+func_decl_end --> function_spec_2, optws, "(", optws, positive_number, optws, ")", optws,
+    ":", optws, type, optws, "*", optws, type, optws, "->", optws, type, optws.
+func_decl_end --> type, optws, opt_func_types, "->", optws, type, optws.
+opt_func_types --> "*", optws, type, optws, opt_func_types.
+opt_func_types --> "".
 function_spec_1 --> "Fx".
 function_spec_1 --> "Fy".
 function_spec_1 --> "xF".
@@ -316,19 +337,19 @@ function_spec_1 --> "yF".
 function_spec_2 --> "xFx".
 function_spec_2 --> "xFy".
 function_spec_2 --> "yFx".
-proposition_decl --> "PROPOSITION", user_name_seq.
-predicate_decl --> "PREDICATE", pred_decl, opt_pred_decls.
-opt_pred_decls --> semicolon, pred_decl, opt_pred_decls.
+proposition_decl --> "PROPOSITION", optws, user_name_seq.
+predicate_decl --> "PREDICATE", optws, pred_decl, opt_pred_decls.
+opt_pred_decls --> semicolon, optws, pred_decl, opt_pred_decls.
 opt_pred_decls --> "".
-pred_decl --> user_name_seq, ":", pred_decl_end.
-pred_decl_end --> predicate_spec_1, ":", type.
-pred_decl_end --> predicate_spec_2, ":", type, "*", type.
-pred_decl_end --> type, opt_func_types.
+pred_decl --> user_name_seq, ":", optws, pred_decl_end.
+pred_decl_end --> predicate_spec_1, optws, ":", optws, type, optws.
+pred_decl_end --> predicate_spec_2, optws, ":", optws, type, optws, "*", optws, type, optws.
+pred_decl_end --> type, optws, opt_func_types.
 predicate_spec_1 --> "Pz".
 predicate_spec_1 --> "zP".
 predicate_spec_2 --> "zPz".
-user_name_seq --> user_name, opt_user_names.
-opt_user_names --> comma, user_name, opt_user_names.
+user_name_seq --> user_name, optws, opt_user_names.
+opt_user_names --> comma, optws, user_name, optws, opt_user_names.
 opt_user_names --> "".
 user_name --> user_big_name.
 user_name --> user_graphic_name.
@@ -336,8 +357,6 @@ user_big_name --> big_name. % cannot be in forbidden_big_names %%TODO
 user_graphic_name --> graphic_name. % cannot be in forbidden_graphic_names %%TODO
 
 % Types
-opt_func_types --> "*", type, opt_func_types.
-opt_func_types --> "".
 opt_constr_types(C,N) --> comma, type, {C1 is C+1}, opt_constr_types(C1,N).
 opt_constr_types(N,N) --> "".
 type --> parameter.
@@ -473,12 +492,12 @@ term_inf --> "(", term, ")".
 term_inf --> function_no_ind, "(", term, opt_terms(1,N), ")".
 opt_terms(C,N) --> comma, term, {C1 is C+1}, opt_terms(C1,N).
 opt_terms(N,N) --> "".
-term_p --> function_ind, term_p. %Fx and Fy
-%TODO
-%term_p with left recursion
-%TODO
-%must be arrity N and imported or declared
-%indicators have Prio p
+term_p --> function_ind, term_p. % Fx and Fy
+% TODO
+% term_p with left recursion
+% TODO
+% must be arrity N and imported or declared
+% indicators have Prio p
 constant --> user_name.
 function_ind --> user_name.
 function_no_ind --> user_name.
@@ -511,3 +530,27 @@ variable --> underscore, variable_end.
 variable --> little_name.
 variable_end --> little_name.
 variable_end --> "".
+
+/* ------------- */
+/* line counting */
+/* ------------- */
+
+ws --> layout_item, optws.
+optws --> layout_item, optws.
+optws --> "".
+
+:- dynamic cur_line_number/1.
+cur_line_number(1).
+
+print_line_count :-
+    cur_line_number(N),
+    print('at line '), print(N), print(' ').
+
+increment_line_count :-
+    retract(cur_line_number(N)),
+    N1 is N+1,
+    assert(cur_line_number(N1)).
+
+reset_line_count :-
+    retractall(cur_line_number(_N)),
+    assert(cur_line_number(1)).
