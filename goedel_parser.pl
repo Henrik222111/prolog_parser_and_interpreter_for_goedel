@@ -15,7 +15,7 @@ parse_file(File) :-
     see(File),
     read_file(Txt),
     seen,
-    reset_line_count, trace,
+    reset_line_count, %trace,
     program(Txt,[]),
     format('end '), print_line_count.
 parse_file(_File) :-
@@ -51,218 +51,229 @@ forbidden_user_graphic_name(Name) :-
     member(Name, ForbiddenNames).
 
 % Tokens
-token --> big_name.
-token --> little_name.
-token --> graphic_name.
-token --> string.
-token --> bracket.
+token --> big_name(_Name).
+token --> little_name(_Name).
+token --> graphic_name(_Name).
+token --> string(_Str).
+token --> bracket(_Nr).
 token --> comma.
 token --> semicolon.
 token --> underscore.
 token --> terminator.
-token --> number.
-token --> float.
-token --> identifier.
-big_name --> big_letter, opt_name_character.
-little_name --> little_letter, opt_name_character.
-graphic_name --> graphic_character, opt_graphic_character.
-string --> "\"", opt_string_character, "\"".
-bracket --> "{".
-bracket --> "}", bracket_label.
-bracket --> "(".
-bracket --> ")".
-bracket --> "[".
-bracket --> "]".
-bracket_label --> "_", label.
-bracket_label --> "".
+token --> number(_Nr).
+token --> float(_Nr).
+token --> identifier(_Ident).
+big_name(Name) --> big_letter(Ch), !, opt_name_character(Ch,Name).
+little_name(Name) --> little_letter(Ch), !, opt_name_character(Ch,Name).
+graphic_name(Name) --> graphic_character(Ch), !, opt_graphic_character(Ch,Name).
+string(Str) --> "\"", opt_string_character('',Str), "\"".
+% Nr is label number or -1 if no label
+bracket(-1) --> "{".
+bracket(Nr) --> "}", bracket_label(Nr).
+bracket(-1) --> "(".
+bracket(-1) --> ")".
+bracket(-1) --> "[".
+bracket(-1) --> "]".
+bracket_label(Nr) --> "_", !, label(Nr).
+bracket_label(-1) --> "".
 comma --> ",".
 semicolon --> ";".
 underscore --> "_".
 terminator --> ".".
-number --> zero, opt_zero.
-number --> positive_number.
-float --> decimal, float_exp.
-float_exp --> "E+", number.
-float_exp --> "E-", number.
-float_exp --> "".
-decimal --> number, ".", number.
-label --> positive_number.
-opt_name_character --> name_character, opt_name_character.
-opt_name_character --> "".
-name_character --> big_letter.
-name_character --> little_letter.
-name_character --> digit.
-name_character --> underscore.
-opt_graphic_character --> graphic_character, opt_graphic_character.
-opt_graphic_character --> "".
-graphic_character --> "\\".
-graphic_character --> non_bs_graphic_char.
-non_rsqm_graphic_character --> "\\".
-non_rsqm_graphic_character --> non_rsqm_non_bs_graphic_char.
-non_rsqm_non_bs_graphic_char --> "+".
-non_rsqm_non_bs_graphic_char --> "-".
-non_rsqm_non_bs_graphic_char --> "*".
-non_rsqm_non_bs_graphic_char --> "/".
-non_rsqm_non_bs_graphic_char --> "^".
-non_rsqm_non_bs_graphic_char --> "#".
-non_rsqm_non_bs_graphic_char --> "<".
-non_rsqm_non_bs_graphic_char --> ">".
-non_rsqm_non_bs_graphic_char --> "=".
-non_rsqm_non_bs_graphic_char --> "~".
-non_rsqm_non_bs_graphic_char --> "&".
-non_rsqm_non_bs_graphic_char --> "?".
-non_rsqm_non_bs_graphic_char --> "‘". % left single quotation mark
-non_rsqm_non_bs_graphic_char --> "@".
-non_rsqm_non_bs_graphic_char --> "!".
-non_rsqm_non_bs_graphic_char --> "$".
-non_rsqm_non_bs_graphic_char --> ":".
-non_rsqm_non_bs_graphic_char --> "|".
-non_bs_graphic_char --> non_rsqm_non_bs_graphic_char.
-non_bs_graphic_char --> "’". % right single quotation mark
-big_letter --> "A".
-big_letter --> "B".
-big_letter --> "C".
-big_letter --> "D".
-big_letter --> "E".
-big_letter --> "F".
-big_letter --> "G".
-big_letter --> "H".
-big_letter --> "I".
-big_letter --> "J".
-big_letter --> "K".
-big_letter --> "L".
-big_letter --> "M".
-big_letter --> "N".
-big_letter --> "O".
-big_letter --> "P".
-big_letter --> "Q".
-big_letter --> "R".
-big_letter --> "S".
-big_letter --> "T".
-big_letter --> "U".
-big_letter --> "V".
-big_letter --> "W".
-big_letter --> "X".
-big_letter --> "Y".
-big_letter --> "Z".
-little_letter --> "a".
-little_letter --> "b".
-little_letter --> "c".
-little_letter --> "d".
-little_letter --> "e".
-little_letter --> "f".
-little_letter --> "g".
-little_letter --> "h".
-little_letter --> "i".
-little_letter --> "j".
-little_letter --> "k".
-little_letter --> "l".
-little_letter --> "m".
-little_letter --> "n".
-little_letter --> "o".
-little_letter --> "p".
-little_letter --> "q".
-little_letter --> "r".
-little_letter --> "s".
-little_letter --> "t".
-little_letter --> "u".
-little_letter --> "v".
-little_letter --> "w".
-little_letter --> "x".
-little_letter --> "y".
-little_letter --> "z".
-positive_number --> opt_zero, non_zero, opt_digit.
-opt_digit --> digit, opt_digit.
-opt_digit --> "".
-digit --> zero.
-digit --> non_zero.
-non_zero --> "1".
-non_zero --> "2".
-non_zero --> "3".
-non_zero --> "4".
-non_zero --> "5".
-non_zero --> "6".
-non_zero --> "7".
-non_zero --> "8".
-non_zero --> "9".
-opt_zero --> zero, opt_zero.
+number(Nr) --> zero(Nr1), !, opt_zero, number_end(Nr2), {Nr is Nr1+Nr2}.
+number(Nr) --> positive_number(Nr).
+number_end(Nr) --> positive_number(Nr), !.
+number_end(Nr) --> {Nr=0}.
+float(Nr) --> decimal(Dec), !, float_exp(Exp), {atom_concat(Dec,Exp,Tmp), atom_number(Tmp,Nr)}.
+float_exp(Exp) --> "E+", !, number(Nr), {atom_concat('E+',Nr,Exp)}.
+float_exp(Exp) --> "E-", !, number(Nr), {atom_concat('E-',Nr,Exp)}.
+float_exp(Exp) --> {Exp=''}.
+decimal(Nr) --> number(Nr1), ".", number(Nr2),{atom_concat(Nr1,'.',Tmp), atom_concat(Tmp,Nr2,Nr)}.
+label(Nr) --> positive_number(Nr).
+opt_name_character(Prev,Name) --> name_character(Ch), !,
+    {atom_concat(Prev,Ch,New)}, opt_name_character(New,Name).
+opt_name_character(Prev,Name) --> {Prev=Name}.
+name_character(Ch) --> big_letter(Ch), !.
+name_character(Ch) --> little_letter(Ch), !.
+name_character(Dig) --> digit(Dig), !.
+name_character(Ch) --> underscore, {Ch='_'}.
+opt_graphic_character(Prev,Name) --> graphic_character(Ch), !,
+    {atom_concat(Prev,Ch,New)}, opt_graphic_character(New,Name).
+opt_graphic_character(Prev,Name) --> {Prev=Name}.
+graphic_character('\\') --> "\\", !.
+graphic_character(Ch) --> non_bs_graphic_char(Ch).
+non_rsqm_graphic_character('\\') --> "\\", !.
+non_rsqm_graphic_character(Ch) --> non_rsqm_non_bs_graphic_char(Ch).
+non_rsqm_non_bs_graphic_char('+') --> "+".
+non_rsqm_non_bs_graphic_char('-') --> "-".
+non_rsqm_non_bs_graphic_char('*') --> "*".
+non_rsqm_non_bs_graphic_char('/') --> "/".
+non_rsqm_non_bs_graphic_char('^') --> "^".
+non_rsqm_non_bs_graphic_char('#') --> "#".
+non_rsqm_non_bs_graphic_char('<') --> "<".
+non_rsqm_non_bs_graphic_char('>') --> ">".
+non_rsqm_non_bs_graphic_char('=') --> "=".
+non_rsqm_non_bs_graphic_char('~') --> "~".
+non_rsqm_non_bs_graphic_char('&') --> "&".
+non_rsqm_non_bs_graphic_char('?') --> "?".
+non_rsqm_non_bs_graphic_char('‘') --> "‘". % left single quotation mark
+non_rsqm_non_bs_graphic_char('@') --> "@".
+non_rsqm_non_bs_graphic_char('!') --> "!".
+non_rsqm_non_bs_graphic_char('$') --> "$".
+non_rsqm_non_bs_graphic_char(':') --> ":".
+non_rsqm_non_bs_graphic_char('|') --> "|".
+non_bs_graphic_char(Ch) --> non_rsqm_non_bs_graphic_char(Ch), !.
+non_bs_graphic_char('’') --> "’". % right single quotation mark
+big_letter('A') --> "A".
+big_letter('B') --> "B".
+big_letter('C') --> "C".
+big_letter('D') --> "D".
+big_letter('E') --> "E".
+big_letter('F') --> "F".
+big_letter('G') --> "G".
+big_letter('H') --> "H".
+big_letter('I') --> "I".
+big_letter('J') --> "J".
+big_letter('K') --> "K".
+big_letter('L') --> "L".
+big_letter('M') --> "M".
+big_letter('N') --> "N".
+big_letter('O') --> "O".
+big_letter('P') --> "P".
+big_letter('Q') --> "Q".
+big_letter('R') --> "R".
+big_letter('S') --> "S".
+big_letter('T') --> "T".
+big_letter('U') --> "U".
+big_letter('V') --> "V".
+big_letter('W') --> "W".
+big_letter('X') --> "X".
+big_letter('Y') --> "Y".
+big_letter('Z') --> "Z".
+little_letter('a') --> "a".
+little_letter('b') --> "b".
+little_letter('c') --> "c".
+little_letter('d') --> "d".
+little_letter('e') --> "e".
+little_letter('f') --> "f".
+little_letter('g') --> "g".
+little_letter('h') --> "h".
+little_letter('i') --> "i".
+little_letter('j') --> "j".
+little_letter('k') --> "k".
+little_letter('l') --> "l".
+little_letter('m') --> "m".
+little_letter('n') --> "n".
+little_letter('o') --> "o".
+little_letter('p') --> "p".
+little_letter('q') --> "q".
+little_letter('r') --> "r".
+little_letter('s') --> "s".
+little_letter('t') --> "t".
+little_letter('u') --> "u".
+little_letter('v') --> "v".
+little_letter('w') --> "w".
+little_letter('x') --> "x".
+little_letter('y') --> "y".
+little_letter('z') --> "z".
+positive_number(Nr) --> opt_zero, non_zero(Dig), opt_digit(Dig,Nr).
+opt_digit(Prev,Nr) --> digit(Dig), !, {New is Prev*10+Dig}, opt_digit(New,Nr).
+opt_digit(Prev,Nr) --> {Prev=Nr}.
+digit(Dig) --> zero(Dig), !.
+digit(Dig) --> non_zero(Dig).
+non_zero(1) --> "1".
+non_zero(2) --> "2".
+non_zero(3) --> "3".
+non_zero(4) --> "4".
+non_zero(5) --> "5".
+non_zero(6) --> "6".
+non_zero(7) --> "7".
+non_zero(8) --> "8".
+non_zero(9) --> "9".
+opt_zero --> zero(_0), !, opt_zero.
 opt_zero --> "".
-zero --> "0".
-opt_string_character --> string_character, opt_string_character.
-opt_string_character --> "".
-string_character --> "\\\\".
-string_character --> "\\\"".
-string_character --> "\\", non_esc_character.
-string_character --> non_esc_character.
-layout_item --> layout_character.
-layout_item --> comment.
-layout_character --> " ", !.
-layout_character --> "\t", !.
-layout_character --> "\r", !, {increment_line_count}.
-layout_character --> "\n", !, {increment_line_count}.
-comment_layout_character --> " ".
+zero(0) --> "0".
+opt_string_character(Prev,Str) --> string_character(Ch), !,
+    {string_concat(Prev,Ch,New)}, opt_string_character(New,Str).
+opt_string_character(Prev,Str) --> {Prev=Str}.
+string_character('\\') --> "\\\\", !.
+string_character('\"')--> "\\\"", !.
+% does not work TODO
+string_character(Ch) --> "\\", !, non_esc_character(EscCh), {atom_concat('\\',EscCh,Ch)}.
+string_character(Ch) --> non_esc_character(Ch).
+layout_item(Ch) --> layout_character(Ch).
+layout_item('') --> comment.
+layout_character(' ') --> " ", !.
+layout_character('\t') --> "\t", !.
+layout_character('\r') --> "\r", !, {increment_line_count}.
+layout_character('\n') --> "\n", !, {increment_line_count}.
+comment_layout_character --> " ", !.
 comment_layout_character --> "\t".
-comment --> "%", opt_comment_character, comment_end.
+comment --> "%", !, opt_comment_character, comment_end.
 comment_end --> "\r", !, {increment_line_count}.
 comment_end --> "\n", !, {increment_line_count}.
-opt_comment_character --> comment_character, opt_comment_character.
+opt_comment_character --> comment_character, !, opt_comment_character.
 opt_comment_character --> "".
+% end--------------------------------------------------------------------
+
 % splited into comment_character, non_rsqm_character, non_dqm_character
 % character --> "\\".
 % character --> "\"".
 % character --> non_esc_character.
-comment_character --> "\\".
-comment_character --> "\"".
+comment_character --> "\\", !.
+comment_character --> "\"", !.
 comment_character --> comment_non_esc_character.
-non_rsqm_character --> "\\".
-non_rsqm_character --> "\"".
-non_rsqm_character --> non_rsqm_non_esc_character.
-non_dqm_character --> "\\".
-non_dqm_character --> non_esc_character.
-non_esc_character --> layout_character.
-non_esc_character --> non_bs_graphic_char.
-non_esc_character --> normal_non_esc_character.
-normal_non_esc_character --> name_character.
-normal_non_esc_character --> semicolon.
-normal_non_esc_character --> comma.
-normal_non_esc_character --> terminator.
-normal_non_esc_character --> "%".
-normal_non_esc_character --> "{".
-normal_non_esc_character --> "}".
-normal_non_esc_character --> "(".
-normal_non_esc_character --> ")".
-normal_non_esc_character --> "[".
-normal_non_esc_character --> "]".
-comment_non_esc_character --> comment_layout_character.
-comment_non_esc_character --> non_bs_graphic_char.
-comment_non_esc_character --> normal_non_esc_character.
-non_rsqm_non_esc_character --> layout_character.
-non_rsqm_non_esc_character --> non_rsqm_non_bs_graphic_char.
-non_rsqm_non_esc_character --> normal_non_esc_character.
-identifier --> quoted_ident.
-identifier --> dble_quoted_ident.
-identifier --> ordinary_ident.
-quoted_ident --> "’", opt_quote_char, "’".
-opt_quote_char --> quote_char, opt_quote_char.
-opt_quote_char --> "".
-quote_char --> "’’".
-quote_char --> non_rsqm_character.
-dble_quoted_ident --> "\"", opt_dble_quoted_char, "\"".
-opt_dble_quoted_char --> dble_quoted_char, opt_dble_quoted_char.
-opt_dble_quoted_char --> "".
-dble_quoted_char --> "\"\"".
-dble_quoted_char --> non_dqm_character.
-ordinary_ident --> ordinary_char, opt_ordinary_char.
-opt_ordinary_char --> ordinary_char, opt_ordinary_char.
-opt_ordinary_char --> "".
-ordinary_char --> name_character.
-ordinary_char --> non_rsqm_graphic_character.
-ordinary_char --> semicolon.
-ordinary_char --> terminator.
-ordinary_char --> "[".
-ordinary_char --> "]".
-ordinary_char --> "{".
-ordinary_char --> "}".
+non_rsqm_character('\\') --> "\\", !.
+non_rsqm_character('\"') --> "\"", !.
+non_rsqm_character(Ch) --> non_rsqm_non_esc_character(Ch).
+non_dqm_character('\\') --> "\\", !.
+non_dqm_character(Ch) --> non_esc_character(Ch).
+non_esc_character(Ch) --> layout_character(Ch), !.
+non_esc_character(Ch) --> non_bs_graphic_char(Ch), !.
+non_esc_character(Ch) --> normal_non_esc_character(Ch).
+normal_non_esc_character(Ch) --> name_character(Ch), !.
+normal_non_esc_character(';') --> semicolon, !.
+normal_non_esc_character(',') --> comma, !.
+normal_non_esc_character('.') --> terminator, !.
+normal_non_esc_character('%') --> "%".
+normal_non_esc_character('{') --> "{".
+normal_non_esc_character('}') --> "}".
+normal_non_esc_character('(') --> "(".
+normal_non_esc_character(')') --> ")".
+normal_non_esc_character('[') --> "[".
+normal_non_esc_character(']') --> "]".
+comment_non_esc_character --> comment_layout_character, !.
+comment_non_esc_character --> non_bs_graphic_char(_Ch), !.
+comment_non_esc_character --> normal_non_esc_character(_Ch).
+non_rsqm_non_esc_character(Ch) --> layout_character(Ch), !.
+non_rsqm_non_esc_character(Ch) --> non_rsqm_non_bs_graphic_char(Ch), !.
+non_rsqm_non_esc_character(Ch) --> normal_non_esc_character(Ch).
+identifier(Ident) --> quoted_ident(Ident), !.
+identifier(Ident) --> dble_quoted_ident(Ident), !.
+identifier(Ident) --> ordinary_ident(Ident).
+quoted_ident(Ident) --> "’", !, opt_quote_char('’', Id), "’", {atom_concat(Id,'’',Ident)}.
+opt_quote_char(Prev,Ident) --> quote_char(Ch), {atom_concat(Prev,Ch,New)}, opt_quote_char(New,Ident).
+opt_quote_char(Prev,Ident) --> {Prev=Ident}.
+quote_char('’’') --> "’’".
+quote_char(Ch) --> non_rsqm_character(Ch).
+dble_quoted_ident(Ident) --> "\"", !, opt_dble_quoted_char('\"', Id), "\"", {atom_concat(Id,'\"',Ident)}.
+opt_dble_quoted_char(Prev,Ident) --> dble_quoted_char(Ch),
+    {atom_concat(Prev,Ch,New)}, opt_dble_quoted_char(New,Ident).
+opt_dble_quoted_char(Prev,Ident) --> {Prev=Ident}.
+dble_quoted_char('\"\"') --> "\"\"", !.
+dble_quoted_char(Ch) --> non_dqm_character(Ch).
+ordinary_ident(Ident) --> ordinary_char(Ch), opt_ordinary_char(Ch,Ident).
+opt_ordinary_char(Prev,Ident) --> ordinary_char(Ch), !,
+    {atom_concat(Prev,Ch,New)}, opt_ordinary_char(New,Ident).
+opt_ordinary_char(Prev,Ident) --> {Prev = Ident}.
+ordinary_char(Ch) --> name_character(Ch), !.
+ordinary_char(Ch) --> non_rsqm_graphic_character(Ch), !.
+ordinary_char(';') --> semicolon, !.
+ordinary_char('.') --> terminator, !.
+ordinary_char('[') --> "[".
+ordinary_char(']') --> "]".
+ordinary_char('{') --> "{".
+ordinary_char('}') --> "}".
 
 % Programs
 program --> goedel_module, !, opt_goedel_module.
@@ -313,7 +324,7 @@ base_decl --> "BASE", optws, user_name_seq.
 constructor_decl --> "CONSTRUCTOR", optws, constr_decl, optws, opt_constr_decls.
 opt_constr_decls --> comma, optws, constr_decl, optws, opt_constr_decls.
 opt_constr_decls --> "".
-constr_decl --> user_name, optws, "/", optws, positive_number, optws.
+constr_decl --> user_name, optws, "/", optws, positive_number(_Nr), optws.
 constant_decl --> "CONSTANT", optws, const_decl, optws, opt_const_decl.
 opt_const_decl --> semicolon, optws, const_decl, optws, opt_const_decl.
 opt_const_decl --> "".
@@ -323,9 +334,9 @@ opt_func_decls --> semicolon, optws, func_decl, optws,  opt_func_decls.
 opt_func_decls --> "".
 % declaration must be transparent %%TODO
 func_decl --> user_name_seq,  ":", optws, func_decl_end.
-func_decl_end --> function_spec_1, optws, "(", optws, positive_number, optws, ")", optws,
+func_decl_end --> function_spec_1, optws, "(", optws, positive_number(_Nr), optws, ")", optws,
     ":", optws, type, optws, "->", optws, type, optws.
-func_decl_end --> function_spec_2, optws, "(", optws, positive_number, optws, ")", optws,
+func_decl_end --> function_spec_2, optws, "(", optws, positive_number(_Nr), optws, ")", optws,
     ":", optws, type, optws, "*", optws, type, optws, "->", optws, type, optws.
 func_decl_end --> type, optws, opt_func_types, "->", optws, type, optws.
 opt_func_types --> "*", optws, type, optws, opt_func_types.
@@ -353,8 +364,8 @@ opt_user_names --> comma, optws, user_name, optws, opt_user_names.
 opt_user_names --> "".
 user_name --> user_big_name.
 user_name --> user_graphic_name.
-user_big_name --> big_name. % cannot be in forbidden_big_names %%TODO
-user_graphic_name --> graphic_name. % cannot be in forbidden_graphic_names %%TODO
+user_big_name --> big_name(_Name). % cannot be in forbidden_big_names %%TODO
+user_graphic_name --> graphic_name(_Name). % cannot be in forbidden_graphic_names %%TODO
 
 % Types
 opt_constr_types(C,N) --> comma, type, {C1 is C+1}, opt_constr_types(C1,N).
@@ -365,7 +376,7 @@ type --> constructor(N), "(", type_seq(N), ")".
 type_seq(N) --> type, opt_constr_types(1,N).
 base --> user_name. % symbol with this name has to be declared or imported as base
 constructor(N) --> user_name. % symbol with this name has to be declared or imported as constructor
-parameter --> little_name.
+parameter --> little_name(_Name).
 
 % Control Declarations
 control_decl --> "DELAY", cont_decl, opt_cont_decls. % only in module where predicate is declared
@@ -405,7 +416,7 @@ body_end --> cformula_f.
 body_end --> "".
 cformula_0 --> "(", cformula_0_f, ")".
 cformula_0 --> "{", cformula_0_f, "}", cformula_0_end.
-cformula_0_end --> "_", label.
+cformula_0_end --> "_", label(_Nr).
 cformula_0_end --> "".
 cformula_0_f --> cformula_0.
 cformula_0_f --> cformula_2.
@@ -483,9 +494,9 @@ term --> term_inf.
 term --> term_p.
 term_inf --> variable.
 term_inf --> constant.
-term_inf --> number.
-term_inf --> float.
-term_inf --> string.
+term_inf --> number(_Nr).
+term_inf --> float(_Nr).
+term_inf --> string(_Str).
 term_inf --> list.
 term_inf --> set.
 term_inf --> "(", term, ")".
@@ -523,20 +534,20 @@ set_expr_mid --> "|", set_expr_end.
 set_expr_mid --> "".
 set_expr_end --> set.
 set_expr_end --> variable.
-variable_seq --> little_name, variable_seq_opt.
-variable_seq_opt --> comma, little_name, variable_seq_opt.
+variable_seq --> little_name(_Name), variable_seq_opt.
+variable_seq_opt --> comma, little_name(_Name), variable_seq_opt.
 variable_seq_opt --> "".
 variable --> underscore, variable_end.
-variable --> little_name.
-variable_end --> little_name.
+variable --> little_name(_Name).
+variable_end --> little_name(_Name).
 variable_end --> "".
 
 /* ------------- */
 /* line counting */
 /* ------------- */
 
-ws --> layout_item, optws.
-optws --> layout_item, optws.
+ws --> layout_item(_Ch), optws.
+optws --> layout_item(_Ch), optws.
 optws --> "".
 
 :- dynamic cur_line_number/1.
