@@ -15,7 +15,7 @@ parse_file(File) :-
     see(File),
     read_file(Txt),
     seen,
-    reset_line_count, %trace,
+    reset, %trace,
     program(Txt,[]),
     format('end '), print_line_count.
 parse_file(_File) :-
@@ -279,93 +279,117 @@ ordinary_char('}') --> "}".
 program --> goedel_module, !, opt_goedel_module.
 opt_goedel_module --> goedel_module, !, opt_goedel_module.
 opt_goedel_module --> "".
-goedel_module --> export_part, local_local_part. % names of parts must be the same %%TODO
+goedel_module --> export_part(Exp), local_local_part(Loc). % names of parts must be the same %%TODO
 goedel_module --> export_part.
-goedel_module --> module_local_part.
-export_part --> export_kind, ws, module_name, optws, terminator, optws, opt_export_item.
+goedel_module --> module_local_part(Loc).
+export_part --> export_kind, ws, module_name(Name), optws, terminator, optws, opt_export_item.
 % local is splitted into module parts (has no export part)
 % and local parts (has export part)
 % local_part --> local_kind, module_name, terminator, opt_local_item.
-local_local_part --> "LOCAL", ws, module_name, optws, terminator, optws, opt_local_local_item.
-module_local_part --> "MODULE", ws, module_name, optws, terminator, optws, opt_module_local_item.
+local_local_part --> "LOCAL", ws, module_name(Name), optws, terminator, optws, opt_local_local_item.
+module_local_part --> "MODULE", ws, module_name(Name), optws, terminator, optws, opt_module_local_item.
 export_kind --> "EXPORT".
 % only system module can have export_kind "CLOSED"
 % export_kind --> "CLOSED".
-opt_module_names --> comma, optws, module_name, opt_module_names.
-opt_module_names --> "".
-module_name --> user_big_name. % cannot be in forbidden_module_names %%TODO
+opt_module_names([Name|Names]) --> comma, !, optws, module_name(Name), !, opt_module_names(Names).
+opt_module_names(Names) --> {Names=[]}.
+module_name(Name) --> user_big_name(Name), !, {\+forbidden_module_name(Name)}.
+
 opt_export_item --> export_item, optws, opt_export_item.
 opt_export_item --> "".
-export_item --> import_decl, optws, terminator, optws.
+export_item --> import_decl(_Names), optws, terminator, optws.
 export_item --> language_decl, optws, terminator, optws.
 export_item --> control_decl, optws, terminator, optws.
 opt_module_local_item --> module_local_item, optws, opt_module_local_item.
 opt_module_local_item --> "".
-module_local_item --> import_decl, optws, terminator, optws.
+module_local_item --> import_decl(_Names), optws, terminator, optws.
 module_local_item --> language_decl, optws, terminator, optws.
 module_local_item --> control_decl, optws, terminator, optws.
 module_local_item --> statement, optws, terminator, optws.
 opt_local_local_item --> local_local_item, optws, opt_local_local_item.
 opt_local_local_item --> "".
 local_local_item --> module_local_item.
-local_local_item --> lift_decl, optws, terminator, optws.
-import_decl --> "IMPORT", ws,  module_name, optws, opt_module_names.
-lift_decl --> "LIFT", ws, module_name, optws, opt_module_names. % only if module has export part
+local_local_item --> lift_decl(_Names), optws, terminator, optws.
+import_decl([Name|Names]) --> "IMPORT", !, ws,  module_name(Name), optws, opt_module_names(Names).
+% only if module has export part
+lift_decl([Name|Names]) --> "LIFT", !, ws, module_name(Name), optws, opt_module_names(Names).
 % No Module may depend upon itself. %%TODO
 
 % Language Declarations
-language_decl --> base_decl.
-language_decl --> constructor_decl.
-language_decl --> constant_decl.
-language_decl --> function_decl.
-language_decl --> proposition_decl.
-language_decl --> predicate_decl.
-base_decl --> "BASE", optws, user_name_seq.
-constructor_decl --> "CONSTRUCTOR", optws, constr_decl, optws, opt_constr_decls.
-opt_constr_decls --> comma, optws, constr_decl, optws, opt_constr_decls.
-opt_constr_decls --> "".
-constr_decl --> user_name, optws, "/", optws, positive_number(_Nr), optws.
-constant_decl --> "CONSTANT", optws, const_decl, optws, opt_const_decl.
-opt_const_decl --> semicolon, optws, const_decl, optws, opt_const_decl.
-opt_const_decl --> "".
-const_decl --> user_name_seq, ":", optws, type, optws. %integer and float constant is treated specially %%TODO
-function_decl --> "FUNCTION", ws, func_decl, optws, opt_func_decls.
-opt_func_decls --> semicolon, optws, func_decl, optws,  opt_func_decls.
-opt_func_decls --> "".
+language_decl --> base_decl(Bases).
+language_decl --> constructor_decl(Constrs).
+language_decl --> constant_decl(Consts).
+language_decl --> function_decl(Funcs).
+language_decl --> proposition_decl(Props).
+language_decl --> predicate_decl(Preds).
+%List of Base names
+base_decl(Bases) --> "BASE", !, optws, user_name_seq(Names), {Bases=Names}.
+% List of constr(Name,Arity)
+constructor_decl([Constr|Constrs]) --> "CONSTRUCTOR", !,  optws, constr_decl(Constr), optws,
+    opt_constr_decls(Constrs).
+opt_constr_decls([Constr|Constrs]) --> comma, !, optws, constr_decl(Constr), optws,
+    opt_constr_decls(Constrs).
+opt_constr_decls(Constrs) --> {Constrs=[]}.
+constr_decl(contr(Name,Nr)) --> user_name(Name), optws, "/", optws, positive_number(Nr), optws.
+% List of const(Name,Type)
+constant_decl(Consts) --> "CONSTANT", !, optws, const_decl(Consts1), optws, opt_const_decl(Consts2),
+    {append(Consts1,Consts2,Consts)}.
+opt_const_decl(Consts) --> semicolon, !, optws, const_decl(Consts1), optws, opt_const_decl(Consts2),
+    {append(Consts1,Consts2,Consts)}.
+opt_const_decl(Consts) --> {Consts=[]}.
+const_decl(Consts) --> user_name_seq(Names), ":", optws, type(Type), optws,
+    {const_list(Names,Type,Consts)}.
+%integer and float constant is treated specially %%TODO
+% List of func(Name,Arity,Spec,Prio,List of Types,Rangetype)
+function_decl(Funcs) --> "FUNCTION", !, ws, func_decl(Funcs1), optws, opt_func_decls(Funcs2),
+    {append(Funcs1,Funcs2,Funcs)}.
+opt_func_decls(Funcs) --> semicolon, !, optws, func_decl(Funcs1), optws,  opt_func_decls(Funcs2),
+    {append(Funcs1,Funcs2,Funcs)}.
+opt_func_decls(Funcs) --> {Funcs=[]}.
 % declaration must be transparent %%TODO
-func_decl --> user_name_seq,  ":", optws, func_decl_end.
-func_decl_end --> function_spec_1, optws, "(", optws, positive_number(_Nr), optws, ")", optws,
-    ":", optws, type, optws, "->", optws, type, optws.
-func_decl_end --> function_spec_2, optws, "(", optws, positive_number(_Nr), optws, ")", optws,
-    ":", optws, type, optws, "*", optws, type, optws, "->", optws, type, optws.
-func_decl_end --> type, optws, opt_func_types, "->", optws, type, optws.
-opt_func_types --> "*", optws, type, optws, opt_func_types.
-opt_func_types --> "".
-function_spec_1 --> "Fx".
-function_spec_1 --> "Fy".
-function_spec_1 --> "xF".
-function_spec_1 --> "yF".
-function_spec_2 --> "xFx".
-function_spec_2 --> "xFy".
-function_spec_2 --> "yFx".
-proposition_decl --> "PROPOSITION", optws, user_name_seq.
-predicate_decl --> "PREDICATE", optws, pred_decl, opt_pred_decls.
-opt_pred_decls --> semicolon, optws, pred_decl, opt_pred_decls.
-opt_pred_decls --> "".
-pred_decl --> user_name_seq, ":", optws, pred_decl_end.
-pred_decl_end --> predicate_spec_1, optws, ":", optws, type, optws.
-pred_decl_end --> predicate_spec_2, optws, ":", optws, type, optws, "*", optws, type, optws.
-pred_decl_end --> type, optws, opt_func_types.
-predicate_spec_1 --> "Pz".
-predicate_spec_1 --> "zP".
-predicate_spec_2 --> "zPz".
-user_name_seq --> user_name, optws, opt_user_names.
-opt_user_names --> comma, optws, user_name, optws, opt_user_names.
-opt_user_names --> "".
-user_name --> user_big_name.
-user_name --> user_graphic_name.
-user_big_name --> big_name(_Name). % cannot be in forbidden_big_names %%TODO
-user_graphic_name --> graphic_name(_Name). % cannot be in forbidden_graphic_names %%TODO
+func_decl(Funcs) --> user_name_seq(Names),  ":", optws, func_decl_end(Spec,Prio,Types,Range),
+    {length(Types,N),func_list(Names,N,Spec,Prio,Types,Range,Funcs)}.
+func_decl_end(Spec,Nr,[Type],Range) --> function_spec_1(Spec), !, optws,
+    "(", optws, positive_number(Nr), optws, ")", optws, ":", optws,
+    type(Type), optws, "->", optws, type(Range), optws.
+func_decl_end(Spec,Nr,[Type1|Type2],Range) --> function_spec_2(Spec), !, optws,
+    "(", optws, positive_number(Nr), optws, ")", optws, ":", optws,
+    type(Type1), optws, "*", optws, type(Type2), optws, "->", optws, type(Range), optws.
+func_decl_end('',-1,[Type|Types],Range) --> type(Type), optws, opt_func_types(Types),
+    "->", optws, type(Range), optws.
+opt_func_types([Type|Types]) --> "*", !, optws, type(Type), optws, opt_func_types(Types).
+opt_func_types(Types) --> {Types=[]}.
+function_spec_1('Fx') --> "Fx".
+function_spec_1('Fy') --> "Fy".
+function_spec_1('xF') --> "xF".
+function_spec_1('yF') --> "yF".
+function_spec_2('xFx') --> "xFx".
+function_spec_2('xFy') --> "xFy".
+function_spec_2('yFx') --> "yFx".
+% List of Prop names
+proposition_decl(Props) --> "PROPOSITION", !, optws, user_name_seq(Names), {Props=Names}.
+% List of pred(Name,Arity,Spec,List of Type)
+predicate_decl(Preds) --> "PREDICATE", !, optws, pred_decl(Preds1), opt_pred_decls(Preds2),
+    {append(Preds1,Preds2,Preds)}.
+opt_pred_decls(Preds) --> semicolon, !, optws, pred_decl(Preds1), opt_pred_decls(Preds2),
+    {append(Preds1,Preds2,Preds)}.
+opt_pred_decls(Preds) --> {Preds=[]}.
+pred_decl(Preds) --> user_name_seq(Names), ":", optws, pred_decl_end(Spec,Types),
+    {length(Types,N), pred_list(Names, N, Spec, Types, Preds)}.
+pred_decl_end(Spec,[Type]) --> predicate_spec_1(Spec), !, optws, ":", optws, type(Type), optws.
+pred_decl_end(Spec,[Type1,Type2]) --> predicate_spec_2(Spec), !, optws, ":", optws, type(Type1),
+    optws, "*", optws, type(Type2), optws.
+pred_decl_end('',[Type|Types]) --> type(Type), optws, opt_func_types(Types).
+predicate_spec_1('Pz') --> "Pz".
+predicate_spec_1('zP') --> "zP".
+predicate_spec_2('zPz') --> "zPz".
+user_name_seq([Name|Names]) --> user_name(Name), !, optws, opt_user_names(Names).
+opt_user_names([Name|Names]) --> comma, !, optws, user_name(Name), !, optws, opt_user_names(Names).
+opt_user_names(Names) --> {Names=[]}.
+user_name(Name) --> user_big_name(Name), !.
+user_name(Name) --> user_graphic_name(Name).
+user_big_name(Name) --> big_name(Name), !, {\+forbidden_user_big_name(Name)}.
+user_graphic_name(Name) --> graphic_name(Name), !, {\+forbidden_user_graphic_name(Name)}.
 
 % Types
 opt_constr_types(C,N) --> comma, type, {C1 is C+1}, opt_constr_types(C1,N).
@@ -374,8 +398,8 @@ type --> parameter.
 type --> base.
 type --> constructor(N), "(", type_seq(N), ")".
 type_seq(N) --> type, opt_constr_types(1,N).
-base --> user_name. % symbol with this name has to be declared or imported as base
-constructor(N) --> user_name. % symbol with this name has to be declared or imported as constructor
+base --> user_name(_Name). % symbol with this name has to be declared or imported as base
+constructor(N) --> user_name(_Name). % symbol with this name has to be declared or imported as constructor
 parameter --> little_name(_Name).
 
 % Control Declarations
@@ -541,6 +565,31 @@ variable --> underscore, variable_end.
 variable --> little_name(_Name).
 variable_end --> little_name(_Name).
 variable_end --> "".
+
+/* ----------------- */
+/* helper predicates */
+/* ----------------- */
+
+reset :-
+    reset_line_count,
+    reset_ast.
+
+:- dynamic ast/3.
+
+reset_ast :-
+    retractall(ast(_,_,_)).
+
+const_list([H|T],Type,[const(H,Type)|R]) :-
+    const_list(T,Type,R).
+const_list([],_,[]).
+
+func_list([H|T],N,Spec,Prio,Types,Range,[func(H,N,Spec,Prio,Types,Range)|R]) :-
+    func_list(T,N,Spec,Prio,Types,Range,R).
+func_list([],_,_,_,_,_,[]).
+
+pred_list([H|T],N,Spec,Types,[pred(H,N,Spec,Types)|R]) :-
+    pred_list(T,N,Spec,Types,R).
+pred_list([],_,_,_,[]).
 
 /* ------------- */
 /* line counting */
