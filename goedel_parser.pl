@@ -1,14 +1,15 @@
 % author: Henrik Hinzmann
 
 % TODOs
-% layout character
 % import export in module must be same name
-% module_name cannot be in forbidden_module_name
 % No Module may depend upon itself.
 % integer and float constant is treated specially (const_decl)
 % func_decl declaration must be transparent
-% user_big_name cannot be in forbidden_big_name
-% user_graphic_name cannot be in forbidden_graphic_name
+
+% Can be done later
+% range_formula
+% list
+% set
 
 parse_file(File) :-
     format('Parsing Gödel file: ~w~n', [File]),
@@ -280,14 +281,14 @@ program --> goedel_module, !, opt_goedel_module.
 opt_goedel_module --> goedel_module, !, opt_goedel_module.
 opt_goedel_module --> "".
 goedel_module --> export_part(Exp), local_local_part(Loc). % names of parts must be the same %%TODO
-goedel_module --> export_part.
+goedel_module --> export_part(Exp).
 goedel_module --> module_local_part(Loc).
-export_part --> export_kind, ws, module_name(Name), optws, terminator, optws, opt_export_item.
+export_part(Exp) --> export_kind, ws, module_name(Name), optws, terminator, optws, opt_export_item.
 % local is splitted into module parts (has no export part)
 % and local parts (has export part)
 % local_part --> local_kind, module_name, terminator, opt_local_item.
-local_local_part --> "LOCAL", ws, module_name(Name), optws, terminator, optws, opt_local_local_item.
-module_local_part --> "MODULE", ws, module_name(Name), optws, terminator, optws, opt_module_local_item.
+local_local_part(Loc) --> "LOCAL", ws, module_name(Name), optws, terminator, optws, opt_local_local_item.
+module_local_part(Loc) --> "MODULE", ws, module_name(Name), optws, terminator, optws, opt_module_local_item.
 export_kind --> "EXPORT".
 % only system module can have export_kind "CLOSED"
 % export_kind --> "CLOSED".
@@ -394,9 +395,9 @@ user_graphic_name(Name) --> graphic_name(Name), !, {\+forbidden_user_graphic_nam
 % Types
 opt_constr_types(C,N) --> comma, type, {C1 is C+1}, opt_constr_types(C1,N).
 opt_constr_types(N,N) --> "".
-type --> parameter.
-type --> base.
-type --> constructor(N), "(", type_seq(N), ")".
+type(_Type) --> parameter.
+type(_Type) --> base.
+type(_Type) --> constructor(N), "(", type_seq(N), ")".
 type_seq(N) --> type, opt_constr_types(1,N).
 base --> user_name(_Name). % symbol with this name has to be declared or imported as base
 constructor(N) --> user_name(_Name). % symbol with this name has to be declared or imported as constructor
@@ -408,13 +409,13 @@ opt_cont_decls --> cont_decl, opt_cont_decls.
 opt_cont_decls --> "".
 % atom cannot be a proposition, no atom pair in delay set can have a
 % common instance
-cont_decl --> goedel_atom, "UNTIL", cond.
+cont_decl --> goedel_atom(_Atom), "UNTIL", cond.
 cond --> cond1, cond_end.
 cond_end --> "&", and_seq.
 cond_end --> "\\/", or_seq.
 cond_end --> "".
-cond1 --> "NONVAR", "(", variable, ")".
-cond1 --> "GROUND", "(", variable, ")".
+cond1 --> "NONVAR", "(", variable(_Var), ")".
+cond1 --> "GROUND", "(", variable(_Var), ")".
 cond1 --> "true".
 cond1 --> "(", cond, ")".
 and_seq --> cond1, and_seq_end.
@@ -425,7 +426,7 @@ or_seq_end --> "\\/", or_seq.
 or_seq_end --> "".
 
 % Statements
-statement --> goedel_atom, statement_end.
+statement --> goedel_atom(_Atom), statement_end.
 statement_end --> "<-", body.
 statement_end --> "".
 body --> "|", body_end.
@@ -463,12 +464,12 @@ formula_f --> formula_1.
 formula_f --> formula_2.
 formula_f --> formula_3.
 formula_f --> formula_4.
-formula_0 --> goedel_atom.
-formula_0 --> range_formula.
+formula_0 --> goedel_atom(_Atom).
+%formula_0 --> range_formula.
 formula_0 --> "(", formula_f, ")".
 formula_1 --> "~", formula_1_end.
-formula_1 --> "SOME", "[", variable_seq, "]", formula_1_end.
-formula_1 --> "ALL", "[", variable_seq, "]", formula_1_end.
+formula_1 --> "SOME", "[", variable_seq(_Vars), "]", formula_1_end.
+formula_1 --> "ALL", "[", variable_seq(_Vars), "]", formula_1_end.
 formula_1_end --> formula_0.
 formula_1_end --> formula_1.
 formula_2 --> formula_0, "&", formula_2_f1_end.
@@ -478,7 +479,7 @@ formula_2 --> "THEN", then_part, formula_2_then_end.
 formula_2_f1_end --> formula_0.
 formula_2_f1_end --> formula_1.
 formula_2_f1_end --> formula_2.
-formula_2_if_end --> "SOME", "[", variable_seq, "]", formula_f.
+formula_2_if_end --> "SOME", "[", variable_seq(_Vars), "]", formula_f.
 formula_2_if_end --> formula_f.
 formula_2_then_end --> "ELSE", formula_2_f1_end.
 formula_2_then_end --> "".
@@ -505,40 +506,35 @@ then_part --> formula_0, then_part_end.
 then_part --> formula_1, then_part_end.
 then_part_end --> "&", then_part.
 then_part_end --> "".
-goedel_atom --> proposition.
-goedel_atom --> predicate_no_ind, "(", term, opt_terms(1,N), ")".
-goedel_atom --> predicate_ind, term.
-goedel_atom --> term, predicate_ind, goedel_atom_end.
-goedel_atom_end --> term.
-goedel_atom_end --> "".
+
+goedel_atom(not(eq(Term1,Term2))) --> term(Term1), "~=", !, term(Term2).
+goedel_atom(eq(Term1,Term2)) --> term(Term1), "=", !, term(Term2).
+goedel_atom(true) --> "True", !.
+goedel_atom(false) --> "False", !.
+goedel_atom(Atom) --> user_name(Name), goedel_atom_end(Name,Atom).
+goedel_atom_end(Name,pred(Name,N,[Term|Terms])) --> "(", !, term(Term), opt_terms(1,N,Terms), ")".
+goedel_atom_end(Name,prop(Name)) --> "".
+/* Can be added later
 range_formula --> term, comperator, term, comperator, term.
 comperator --> "<".
-comperator --> "=<".
-term --> term_inf.
-term --> term_p.
-term_inf --> variable.
-term_inf --> constant.
-term_inf --> number(_Nr).
-term_inf --> float(_Nr).
-term_inf --> string(_Str).
-term_inf --> list.
-term_inf --> set.
-term_inf --> "(", term, ")".
-term_inf --> function_no_ind, "(", term, opt_terms(1,N), ")".
-opt_terms(C,N) --> comma, term, {C1 is C+1}, opt_terms(C1,N).
-opt_terms(N,N) --> "".
-term_p --> function_ind, term_p. % Fx and Fy
-% TODO
-% term_p with left recursion
-% TODO
-% must be arrity N and imported or declared
-% indicators have Prio p
-constant --> user_name.
-function_ind --> user_name.
-function_no_ind --> user_name.
-proposition --> user_name.
-predicate_ind --> user_name.
-predicate_no_ind --> user_name.
+comperator --> "=<".*/
+term(var(Var)) --> variable(Var), !.
+term(fl(Fl)) --> float(Fl), !.
+term(nr(Nr)) --> number(Nr), !.
+term(str(Str)) --> string(Str), !.
+%term --> list.
+%term --> set.
+term(Term) --> "(", !, term(Term), ")".
+term(Term) --> user_name(Name), term_end(Name,Term).
+term_end(Name,func(Name,N,[Term|Terms])) --> "(", !, term(Term), opt_terms(1,N,Terms), ")".
+term_end(Name,cons(Name)) --> "".
+opt_terms(C,N,[Term|Terms]) --> comma, !, term(Term), {C1 is C+1}, opt_terms(C1,N,Terms).
+opt_terms(N,N,Terms) --> {Terms=[]}.
+
+
+
+
+/* Can be later used for Lists
 list --> "[", list_mid, "]".
 list_mid --> list_expr.
 list_mid --> "".
@@ -547,7 +543,8 @@ list_expr_mid --> comma, list_expr.
 list_expr_mid --> "|", list_expr_end.
 list_expr_mid --> "".
 list_expr_end --> list.
-list_expr_end --> variable.
+list_expr_end --> variable(Var).*/
+/* Can be later used for Sets
 set --> "{", set_mid, "}".
 set_mid --> term, ":", formula_f.
 set_mid --> set_expr.
@@ -557,14 +554,14 @@ set_expr_mid --> comma, set_expr.
 set_expr_mid --> "|", set_expr_end.
 set_expr_mid --> "".
 set_expr_end --> set.
-set_expr_end --> variable.
-variable_seq --> little_name(_Name), variable_seq_opt.
-variable_seq_opt --> comma, little_name(_Name), variable_seq_opt.
-variable_seq_opt --> "".
-variable --> underscore, variable_end.
-variable --> little_name(_Name).
-variable_end --> little_name(_Name).
-variable_end --> "".
+set_expr_end --> variable(Var).*/
+variable_seq([Name|Vars]) --> little_name(Name), !, variable_seq_opt(Vars).
+variable_seq_opt([Name|Vars]) --> comma, !, little_name(Name), variable_seq_opt(Vars).
+variable_seq_opt(Vars) --> {Vars=[]}.
+variable(Name) --> underscore, !, variable_end(UName), {atom_concat('_',UName,Name)}.
+variable(Name) --> little_name(Name).
+variable_end(Name) --> little_name(Name), !.
+variable_end(Name) --> {Name=''}.
 
 /* ----------------- */
 /* helper predicates */
