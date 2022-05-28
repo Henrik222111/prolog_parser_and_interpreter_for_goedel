@@ -18,7 +18,7 @@ parse_file(File) :-
     seen,
     reset, %trace,
     program(Txt,[]),
-    format('end '), print_line_count.
+    format('end '), print_line_count, !.
 parse_file(_File) :-
     format('fail '), print_line_count.
 
@@ -213,10 +213,10 @@ comment_layout_character --> "\t".
 comment --> "%", !, opt_comment_character, comment_end.
 comment_end --> "\r", !, {increment_line_count}.
 comment_end --> "\n", !, {increment_line_count}.
+% Comment at the end of file
+comment_end([],[]).
 opt_comment_character --> comment_character, !, opt_comment_character.
 opt_comment_character --> "".
-% end--------------------------------------------------------------------
-
 % splited into comment_character, non_rsqm_character, non_dqm_character
 % character --> "\\".
 % character --> "\"".
@@ -276,19 +276,26 @@ ordinary_char(']') --> "]".
 ordinary_char('{') --> "{".
 ordinary_char('}') --> "}".
 
+
 % Programs
+program --> optws, goedel_module.
+/* Support for more modules can be added later
 program --> goedel_module, !, opt_goedel_module.
 opt_goedel_module --> goedel_module, !, opt_goedel_module.
-opt_goedel_module --> "".
-goedel_module --> export_part(Exp), local_local_part(Loc). % names of parts must be the same %%TODO
-goedel_module --> export_part(Exp).
-goedel_module --> module_local_part(Loc).
-export_part(Exp) --> export_kind, ws, module_name(Name), optws, terminator, optws, opt_export_item.
+opt_goedel_module --> "".*/
+goedel_module --> export_part(ModName), goedel_module_end(ModName).
+goedel_module --> module_local_part.
+goedel_module_end(ModName) --> local_local_part(ModName), !.
+goedel_module_end(_ModName) --> "".
+export_part(ModName) --> export_kind, !, ws, module_name(ModName), {add_module(ModName)},
+    optws, terminator, optws, opt_export_item(ModName).
 % local is splitted into module parts (has no export part)
 % and local parts (has export part)
 % local_part --> local_kind, module_name, terminator, opt_local_item.
-local_local_part(Loc) --> "LOCAL", ws, module_name(Name), optws, terminator, optws, opt_local_local_item.
-module_local_part(Loc) --> "MODULE", ws, module_name(Name), optws, terminator, optws, opt_module_local_item.
+local_local_part(ModName) --> "LOCAL", ws, module_name(Name), {ModName=Name}, optws, terminator,
+    optws, opt_local_local_item(ModName).
+module_local_part --> "MODULE", ws, module_name(ModName), {add_module(ModName)},
+    optws, terminator, optws, opt_module_local_item(ModName).
 export_kind --> "EXPORT".
 % only system module can have export_kind "CLOSED"
 % export_kind --> "CLOSED".
@@ -296,33 +303,39 @@ opt_module_names([Name|Names]) --> comma, !, optws, module_name(Name), !, opt_mo
 opt_module_names(Names) --> {Names=[]}.
 module_name(Name) --> user_big_name(Name), !, {\+forbidden_module_name(Name)}.
 
-opt_export_item --> export_item, optws, opt_export_item.
-opt_export_item --> "".
-export_item --> import_decl(_Names), optws, terminator, optws.
-export_item --> language_decl, optws, terminator, optws.
-export_item --> control_decl, optws, terminator, optws.
-opt_module_local_item --> module_local_item, optws, opt_module_local_item.
-opt_module_local_item --> "".
-module_local_item --> import_decl(_Names), optws, terminator, optws.
-module_local_item --> language_decl, optws, terminator, optws.
-module_local_item --> control_decl, optws, terminator, optws.
-module_local_item --> statement, optws, terminator, optws.
-opt_local_local_item --> local_local_item, optws, opt_local_local_item.
-opt_local_local_item --> "".
-local_local_item --> module_local_item.
-local_local_item --> lift_decl(_Names), optws, terminator, optws.
+opt_export_item(ModName) --> export_item(ModName), !, optws, opt_export_item(ModName).
+opt_export_item(_ModName) --> "".
+export_item(ModName) --> import_decl(Imports), !, {add_exp_imports(ModName,Imports)},
+    optws, terminator, optws.
+export_item(ModName) --> language_decl(ModName), !, optws, terminator, optws.
+export_item(ModName) --> control_decl(Controls), {add_exp_controls(ModName,Controls)},
+    optws, terminator, optws.
+opt_module_local_item(ModName) --> module_local_item(ModName), !, optws, opt_module_local_item(ModName).
+opt_module_local_item(_ModName) --> "".
+module_local_item(ModName) --> import_decl(Imports), !, {add_loc_imports(ModName,Imports)},
+    optws, terminator, optws.
+module_local_item(ModName) --> language_decl(ModName), !, optws, terminator, optws.
+module_local_item(ModName) --> control_decl(Controls), !, {add_loc_controls(ModName,Controls)},
+    optws, terminator, optws.
+module_local_item(ModName) --> statement(Statement), {add_statement(ModName,Statement)},
+    optws, terminator, optws.
+opt_local_local_item(ModName) --> local_local_item(ModName), !, optws, opt_local_local_item(ModName).
+opt_local_local_item(_ModName) --> "".
+local_local_item(ModName) --> module_local_item(ModName), !.
+local_local_item(ModName) --> lift_decl(Lifts), {add_lifts(ModName,Lifts)}, optws, terminator, optws.
 import_decl([Name|Names]) --> "IMPORT", !, ws,  module_name(Name), optws, opt_module_names(Names).
 % only if module has export part
 lift_decl([Name|Names]) --> "LIFT", !, ws, module_name(Name), optws, opt_module_names(Names).
 % No Module may depend upon itself. %%TODO
 
+
 % Language Declarations
-language_decl --> base_decl(Bases).
-language_decl --> constructor_decl(Constrs).
-language_decl --> constant_decl(Consts).
-language_decl --> function_decl(Funcs).
-language_decl --> proposition_decl(Props).
-language_decl --> predicate_decl(Preds).
+language_decl(ModName) --> base_decl(Bases), {add_bases(ModName,Bases)}.
+language_decl(ModName) --> constructor_decl(Constrs), {add_constrs(ModName,Constrs)}.
+language_decl(ModName) --> constant_decl(Consts), {add_consts(ModName,Consts)}.
+language_decl(ModName) --> function_decl(Funcs), {add_funcs(ModName,Funcs)}.
+language_decl(ModName) --> proposition_decl(Props), {add_props(ModName,Props)}.
+language_decl(ModName) --> predicate_decl(Preds), {add_preds(ModName,Preds)}.
 %List of Base names
 base_decl(Bases) --> "BASE", !, optws, user_name_seq(Names), {Bases=Names}.
 % List of constr(Name,Arity)
@@ -331,7 +344,7 @@ constructor_decl([Constr|Constrs]) --> "CONSTRUCTOR", !,  optws, constr_decl(Con
 opt_constr_decls([Constr|Constrs]) --> comma, !, optws, constr_decl(Constr), optws,
     opt_constr_decls(Constrs).
 opt_constr_decls(Constrs) --> {Constrs=[]}.
-constr_decl(contr(Name,Nr)) --> user_name(Name), optws, "/", optws, positive_number(Nr), optws.
+constr_decl(constr(Name,Nr)) --> user_name(Name), optws, "/", optws, positive_number(Nr), optws.
 % List of const(Name,Type)
 constant_decl(Consts) --> "CONSTANT", !, optws, const_decl(Consts1), optws, opt_const_decl(Consts2),
     {append(Consts1,Consts2,Consts)}.
@@ -392,121 +405,122 @@ user_name(Name) --> user_graphic_name(Name).
 user_big_name(Name) --> big_name(Name), !, {\+forbidden_user_big_name(Name)}.
 user_graphic_name(Name) --> graphic_name(Name), !, {\+forbidden_user_graphic_name(Name)}.
 
+
 % Types
-opt_constr_types(C,N) --> comma, type, {C1 is C+1}, opt_constr_types(C1,N).
-opt_constr_types(N,N) --> "".
-type(_Type) --> parameter.
-type(_Type) --> base.
-type(_Type) --> constructor(N), "(", type_seq(N), ")".
-type_seq(N) --> type, opt_constr_types(1,N).
-base --> user_name(_Name). % symbol with this name has to be declared or imported as base
-constructor(N) --> user_name(_Name). % symbol with this name has to be declared or imported as constructor
-parameter --> little_name(_Name).
+type(par(Name)) --> little_name(Name), !.
+type(Type) --> user_name(Name), optws, type_end(Name,Type).
+type_end(Name,Type) --> "(", !, optws, type_seq(N,Types), optws, ")", {Type=constr(Name,N,Types)}.
+type_end(Name,Type) --> {Type=base(Name)}.
+type_seq(N,[Type|Types]) --> type(Type), optws, opt_constr_types(1,N,Types).
+opt_constr_types(C,N,[Type|Types]) --> comma, !, optws, type(Type), optws, {C1 is C+1},
+    opt_constr_types(C1,N,Types).
+opt_constr_types(C,N,Types) --> {N=C, Types=[]}.
+
 
 % Control Declarations
-control_decl --> "DELAY", cont_decl, opt_cont_decls. % only in module where predicate is declared
-opt_cont_decls --> cont_decl, opt_cont_decls.
-opt_cont_decls --> "".
+control_decl([Delay|Delays]) --> "DELAY", optws, cont_decl(Delay), optws, opt_cont_decls(Delays).
+% only in module where predicate is declared
+opt_cont_decls([Delay|Delays]) --> cont_decl(Delay), !, optws, opt_cont_decls(Delays).
+opt_cont_decls(Delays) --> {Delays=[]}.
 % atom cannot be a proposition, no atom pair in delay set can have a
 % common instance
-cont_decl --> goedel_atom(_Atom), "UNTIL", cond.
-cond --> cond1, cond_end.
-cond_end --> "&", and_seq.
-cond_end --> "\\/", or_seq.
-cond_end --> "".
-cond1 --> "NONVAR", "(", variable(_Var), ")".
-cond1 --> "GROUND", "(", variable(_Var), ")".
-cond1 --> "true".
-cond1 --> "(", cond, ")".
-and_seq --> cond1, and_seq_end.
-and_seq_end --> "&", and_seq.
-and_seq_end --> "".
-or_seq --> cond1, or_seq_end.
-or_seq_end --> "\\/", or_seq.
-or_seq_end --> "".
+cont_decl(delay(Atom,Cond)) --> goedel_atom(Atom), optws, "UNTIL", optws, !, cond(Cond), optws.
+cond(Cond) --> cond1(Cond1), cond_end(Cond1,Cond).
+cond_end(Cond1,Cond) --> "&", !, optws, and_seq(Cond1,Cond).
+cond_end(Cond1,Cond) --> "\\/", !, optws, or_seq(Cond1,Cond).
+cond_end(Cond1,Cond) --> {Cond=Cond1}.
+cond1(nvar(Var)) --> "NONVAR", !, optws, "(", optws, variable(Var), optws, ")", optws.
+cond1(grnd(Var)) --> "GROUND", !, optws, "(", optws, variable(Var), optws, ")", optws.
+cond1(true) --> "TRUE", !, optws.
+cond1(Cond) --> "(", optws, cond(Cond), optws, ")", optws.
+and_seq(Cond1,Cond) --> cond1(Cond2), optws, and_seq_end(and(Cond1,Cond2),Cond).
+and_seq_end(Cond1,Cond) --> "&", !, optws, and_seq(Cond1,Cond).
+and_seq_end(Cond1,Cond) --> {Cond=Cond1}.
+or_seq(Cond1,Cond) --> cond1(Cond2), optws, or_seq_end(or(Cond1,Cond2),Cond).
+or_seq_end(Cond1,Cond) --> "\\/", !, optws, or_seq(Cond1,Cond).
+or_seq_end(Cond1,Cond) --> {Cond=Cond1}.
+
 
 % Statements
-statement --> goedel_atom(_Atom), statement_end.
-statement_end --> "<-", body.
-statement_end --> "".
-body --> "|", body_end.
-body --> cformula_0, body_mid.
-body --> cformula_2, body_mid.
-body --> cformula_f, body_mid.
-body_mid --> "|", body_end.
-body_mid --> "".
-body_end --> cformula_0.
-body_end --> cformula_2.
-body_end --> cformula_f.
-body_end --> "".
-cformula_0 --> "(", cformula_0_f, ")".
-cformula_0 --> "{", cformula_0_f, "}", cformula_0_end.
-cformula_0_end --> "_", label(_Nr).
-cformula_0_end --> "".
-cformula_0_f --> cformula_0.
-cformula_0_f --> cformula_2.
-cformula_0_f --> cformula_f.
-cformula_2 --> cformula_0, "&", cformula_2_end.
-cformula_2 --> formula_0, "&", cformula_2_end.
-cformula_2 --> formula_1, "&", cformula_2_end.
-cformula_2_end --> cformula_0.
-cformula_2_end --> cformula_2.
-cformula_2_end --> formula_0.
-cformula_2_end --> formula_1.
-cformula_2_end --> formula_2.
-cformula_f --> formula_0.
-cformula_f --> formula_1.
-cformula_f --> formula_2.
-cformula_f --> formula_3.
-cformula_f --> formula_4.
-formula_f --> formula_0.
-formula_f --> formula_1.
-formula_f --> formula_2.
-formula_f --> formula_3.
-formula_f --> formula_4.
-formula_0 --> goedel_atom(_Atom).
+statement(Stm) --> optws, goedel_atom(Head), optws, statement_end(Head,Stm).
+statement_end(Head,stm(Head,Body)) --> "<-", !, optws, body(Body).
+statement_end(Head,Stm) --> {Stm=stm(Head)}.
+% Pruning cann be added later with "|"
+body(Form) --> cformula_2(Form), !.
+body(Form) --> cformula_0(Form), !.
+body(Form) --> cformula_f(Form), !.
+cformula_0(Form) --> "(", !, optws, cformula_0_f(Form), optws, ")".
+/* Pruning can be added later
+cformula_0(Form) --> "{", optws, cformula_0_f(Form), optws, "}", cformula_0_end(_Label).
+cformula_0_end(Nr) --> "_", label(Nr).
+cformula_0_end(-1) --> "". */
+cformula_0_f(Form) --> cformula_2(Form), !.
+cformula_0_f(Form) --> cformula_0(Form), !.
+cformula_0_f(Form) --> cformula_f(Form).
+cformula_2(and(Form1,Form2)) --> cformula_0(Form1), !, optws, "&", optws, cformula_2_end(Form2).
+cformula_2(and(Form1,Form2)) --> formula_1(Form1), !, optws, "&", optws, cformula_2_end(Form2).
+cformula_2(and(Form1,Form2)) --> formula_0(Form1), optws, "&", optws, cformula_2_end(Form2).
+cformula_2_end(Form) --> cformula_2(Form).
+cformula_2_end(Form) --> cformula_0(Form).
+cformula_2_end(Form) --> formula_2(Form), !.
+cformula_2_end(Form) --> formula_1(Form), !.
+cformula_2_end(Form) --> formula_0(Form).
+cformula_f(Form) --> formula_4(Form), !.
+cformula_f(Form) --> formula_3(Form), !.
+cformula_f(Form) --> formula_2(Form), !.
+cformula_f(Form) --> formula_1(Form), !.
+cformula_f(Form) --> formula_0(Form).
+formula_f(Form) --> formula_4(Form), !, optws.
+formula_f(Form) --> formula_3(Form), !, optws.
+formula_f(Form) --> formula_2(Form), !, optws.
+formula_f(Form) --> formula_1(Form), !, optws.
+formula_f(Form) --> formula_0(Form), optws.
+formula_0(Form) --> "(", !, optws, formula_f(Form), optws, ")", optws.
+formula_0(Atom) --> goedel_atom(Atom), optws.
 %formula_0 --> range_formula.
-formula_0 --> "(", formula_f, ")".
-formula_1 --> "~", formula_1_end.
-formula_1 --> "SOME", "[", variable_seq(_Vars), "]", formula_1_end.
-formula_1 --> "ALL", "[", variable_seq(_Vars), "]", formula_1_end.
-formula_1_end --> formula_0.
-formula_1_end --> formula_1.
-formula_2 --> formula_0, "&", formula_2_f1_end.
-formula_2 --> formula_1, "&", formula_2_f1_end.
-formula_2 --> "IF", formula_2_if_end.
-formula_2 --> "THEN", then_part, formula_2_then_end.
-formula_2_f1_end --> formula_0.
-formula_2_f1_end --> formula_1.
-formula_2_f1_end --> formula_2.
-formula_2_if_end --> "SOME", "[", variable_seq(_Vars), "]", formula_f.
-formula_2_if_end --> formula_f.
-formula_2_then_end --> "ELSE", formula_2_f1_end.
-formula_2_then_end --> "".
-formula_3 --> formula_0, "\\/", formula_3_end.
-formula_3 --> formula_1, "\\/", formula_3_end.
-formula_3 --> formula_2, "\\/", formula_3_end.
-formula_3_end --> formula_0.
-formula_3_end --> formula_1.
-formula_3_end --> formula_2.
-formula_3_end --> formula_3.
-formula_4 --> formula_0, formula_4_mid.
-formula_4 --> formula_1, formula_4_mid.
-formula_4 --> formula_2, formula_4_mid.
-formula_4 --> formula_3, formula_4_mid.
-formula_4_mid --> "<-", formula_f.
-formula_4_mid --> "->", formula_f.
-formula_4_mid --> "<->", formula_4_end.
-formula_4_end --> formula_0.
-formula_4_end --> formula_1.
-formula_4_end --> formula_2.
-formula_4_end --> formula_3.
-then_part --> "IF", formula_f, "THEN", then_part.
-then_part --> formula_0, then_part_end.
-then_part --> formula_1, then_part_end.
-then_part_end --> "&", then_part.
-then_part_end --> "".
-
+formula_1(not(Form)) --> "~", !, optws, formula_1_end(Form).
+formula_1(some(Vars,Form)) --> "SOME", !, optws, "[", optws, variable_seq(Vars), optws, "]", optws,
+    formula_1_end(Form), optws.
+formula_1(all(Vars,Form)) --> "ALL", optws, "[", optws, variable_seq(Vars), optws, "]", optws,
+    formula_1_end(Form), optws.
+formula_1_end(Form) --> formula_1(Form).
+formula_1_end(Form) --> formula_0(Form).
+formula_2(and(Form1,Form2)) --> formula_1(Form1), !, optws, "&", optws, formula_2_end(Form2), optws.
+formula_2(and(Form1,Form2)) --> formula_0(Form1), !, optws, "&", optws, formula_2_end(Form2), optws.
+formula_2(Form) --> "IF", optws, formula_2_mid(If), optws, "THEN", optws,
+    then_part(Then), formula_2_else(If,Then,Form).
+formula_2_end(Form) --> formula_2(Form), !.
+formula_2_end(Form) --> formula_1(Form), !.
+formula_2_end(Form) --> formula_0(Form).
+formula_2_mid(some(Vars,Form)) --> "SOME", !, optws, "[", optws, variable_seq(Vars), optws, "]",
+    optws, formula_f(Form).
+formula_2_mid(Form) --> formula_f(Form).
+formula_2_else(If,Then,if(If,Then,Else)) --> "ELSE", !, optws, formula_2_end(Else).
+formula_2_else(If,Then,Form) --> {Form=if(If,Then)}.
+formula_3(or(Form1,Form2)) --> formula_2(Form1), !, optws, "\\/", optws, formula_3_end(Form2), optws.
+formula_3(or(Form1,Form2)) --> formula_1(Form1), !, optws, "\\/", optws, formula_3_end(Form2), optws.
+formula_3(or(Form1,Form2)) --> formula_0(Form1), optws, "\\/", optws, formula_3_end(Form2), optws.
+formula_3_end(Form) --> formula_3(Form), !.
+formula_3_end(Form) --> formula_2(Form), !.
+formula_3_end(Form) --> formula_1(Form), !.
+formula_3_end(Form) --> formula_0(Form).
+formula_4(Form) --> formula_3(Form1), !, optws, formula_4_mid(Form1,Form), optws.
+formula_4(Form) --> formula_2(Form1), !, optws, formula_4_mid(Form1,Form), optws.
+formula_4(Form) --> formula_1(Form1), !, optws, formula_4_mid(Form1,Form), optws.
+formula_4(Form) --> formula_0(Form1), optws, formula_4_mid(Form1,Form), optws.
+formula_4_mid(Form1,rImpl(Form1,Form2)) --> "<-", !, optws, formula_f(Form2).
+formula_4_mid(Form1,lImpl(Form1,Form2)) --> "->", !, optws, formula_f(Form2).
+formula_4_mid(Form1,equi(Form1,Form2)) --> "<->", optws, formula_4_end(Form2).
+formula_4_end(Form) --> formula_3(Form), !.
+formula_4_end(Form) --> formula_2(Form), !.
+formula_4_end(Form) --> formula_1(Form), !.
+formula_4_end(Form) --> formula_0(Form).
+then_part(if(If,Then)) --> "IF", !, optws, formula_f(If), optws, "THEN", optws , then_part(Then), optws.
+then_part(Form) --> formula_1(Form1), !, optws, then_part_end(Form1,Form), optws.
+then_part(Form) --> formula_0(Form1), optws, then_part_end(Form1,Form), optws.
+% TODO: Building and(A,and(B,C)) instead of and(and(A,B),C). Problem?
+then_part_end(Form1,and(Form1,Form2)) --> "&", !, optws, then_part(Form2).
+then_part_end(Form1,Form) --> {Form=Form1}.
 goedel_atom(not(eq(Term1,Term2))) --> term(Term1), "~=", !, term(Term2).
 goedel_atom(eq(Term1,Term2)) --> term(Term1), "=", !, term(Term2).
 goedel_atom(true) --> "True", !.
@@ -530,10 +544,6 @@ term_end(Name,func(Name,N,[Term|Terms])) --> "(", !, term(Term), opt_terms(1,N,T
 term_end(Name,cons(Name)) --> "".
 opt_terms(C,N,[Term|Terms]) --> comma, !, term(Term), {C1 is C+1}, opt_terms(C1,N,Terms).
 opt_terms(N,N,Terms) --> {Terms=[]}.
-
-
-
-
 /* Can be later used for Lists
 list --> "[", list_mid, "]".
 list_mid --> list_expr.
@@ -563,6 +573,7 @@ variable(Name) --> little_name(Name).
 variable_end(Name) --> little_name(Name), !.
 variable_end(Name) --> {Name=''}.
 
+
 /* ----------------- */
 /* helper predicates */
 /* ----------------- */
@@ -575,6 +586,93 @@ reset :-
 
 reset_ast :-
     retractall(ast(_,_,_)).
+
+add_module(ModName) :-
+    % lang(base,constr,const,func,prop,pred)
+    Lang=lang([],[],[],[],[],[]),
+    % exp(imp,lang,cont)
+    Exp=exp([],Lang,[]),
+    % loc(imp,lift,lang,cont,stmnt)
+    Loc=loc([],[],Lang,[],[]),
+    assert(ast(ModName,Exp,Loc)).
+
+% Adding items to AST
+
+add_exp_imports(ModName,Imports) :-
+    retract(ast(ModName,exp(Imp,Lang,Cont),Loc)),
+    append(Imp,Imports,New),
+    assert(ast(ModName,exp(New,Lang,Cont),Loc)).
+
+add_loc_imports(ModName,Imports) :-
+    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
+    append(Imp,Imports,New),
+    assert(ast(ModName,Exp,loc(New,Lift,Lang,Cont,Stmnt))).
+
+add_lifts(ModName,Lifts) :-
+    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
+    append(Lift,Lifts,New),
+    assert(ast(ModName,Exp,loc(Imp,New,Lang,Cont,Stmnt))).
+
+add_exp_controls(ModName,Controls) :-
+    retract(ast(ModName,exp(Imp,Lang,Cont),Loc)),
+    append(Cont,Controls,New),
+    assert(ast(ModName,exp(Imp,Lang,New),Loc)).
+
+add_loc_controls(ModName,Controls) :-
+    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
+    append(Cont,Controls,New),
+    assert(ast(ModName,Exp,loc(Imp,Lift,Lang,New,Stmnt))).
+
+add_statement(ModName,Statement) :-
+    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
+    append(Stmnt,[Statement],New),
+    assert(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,New))).
+
+% Adding Language Declarations to ast
+
+add_bases(ModName,Bases) :-
+    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
+    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
+    append(Base,Bases,New),
+    NewLang=lang(New,Constr,Const,Func,Prop,Pred),
+    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+
+add_constrs(ModName,Constrs) :-
+    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
+    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
+    append(Constr,Constrs,New),
+    NewLang=lang(Base,New,Const,Func,Prop,Pred),
+    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+
+add_consts(ModName,Consts) :-
+    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
+    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
+    append(Const,Consts,New),
+    NewLang=lang(Base,Constr,New,Func,Prop,Pred),
+    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+
+add_funcs(ModName,Funcs) :-
+    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
+    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
+    append(Func,Funcs,New),
+    NewLang=lang(Base,Constr,Const,New,Prop,Pred),
+    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+
+add_props(ModName,Props) :-
+    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
+    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
+    append(Prop,Props,New),
+    NewLang=lang(Base,Constr,Const,Func,New,Pred),
+    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+
+add_preds(ModName,Preds) :-
+    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
+    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
+    append(Pred,Preds,New),
+    NewLang=lang(Base,Constr,Const,Func,Prop,New),
+    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+
+% Building Lists
 
 const_list([H|T],Type,[const(H,Type)|R]) :-
     const_list(T,Type,R).
