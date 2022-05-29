@@ -13,9 +13,11 @@
 
 parse_file(File) :-
     format('Parsing Gödel file: ~w~n', [File]),
-    see(File),
+    open(File,read,Stream),
+    set_stream(Stream,newline(posix)),
+    set_input(Stream),
     read_file(Txt),
-    seen,
+    close(Stream),
     reset, %trace,
     program(Txt,[]),
     format('end '), print_line_count, !.
@@ -200,13 +202,16 @@ opt_string_character(Prev,Str) --> {Prev=Str}.
 string_character('\\') --> "\\\\", !.
 string_character('\"')--> "\\\"", !.
 % does not work TODO
-string_character(Ch) --> "\\", !, non_esc_character(EscCh), {atom_concat('\\',EscCh,Ch)}.
+string_character('\t') --> "\\t", !.
+string_character('\r') --> "\\r", !.
+string_character('\n') --> "\\n", !.
 string_character(Ch) --> non_esc_character(Ch).
 layout_item(Ch) --> layout_character(Ch).
 layout_item('') --> comment.
 layout_character(' ') --> " ", !.
 layout_character('\t') --> "\t", !.
-layout_character('\r') --> "\r", !, {increment_line_count}.
+layout_character('\n') --> "\r\n", !, {increment_line_count}.
+layout_character('\n') --> "\r", !, {increment_line_count}.
 layout_character('\n') --> "\n", !, {increment_line_count}.
 comment_layout_character --> " ", !.
 comment_layout_character --> "\t".
