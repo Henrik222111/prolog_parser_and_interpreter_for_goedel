@@ -579,6 +579,57 @@ variable_end(Name) --> little_name(Name), !.
 variable_end(Name) --> {Name=''}.
 
 
+/* ------------ */
+/* Type Checker */
+/* ------------ */
+
+check_types :-
+    fail.
+
+% Base is Name
+exp_acc_base(ModName,Base) :-
+    ast(ModName,exp(_,lang(EBase,_,_,_,_,_),_),_),
+    member(Base,EBase), !.
+exp_acc_base(ModName,Base) :-
+    ast(ModName,exp(EImp,_,_),_),
+    imp_acc_base(EImp,Base).
+loc_acc_base(ModName,Base) :-
+    ast(ModName,exp(_,lang(EBase,_,_,_,_,_),_),loc(_,_,lang(LBase,_,_,_,_,_),_,_)),
+    append(LBase,EBase,Bases),
+    member(Base,Bases), !.
+loc_acc_base(ModName,Base) :-
+    ast(ModName,exp(EImp,_,_),loc(LImp,Lift,_,_,_)),
+    append(LImp,Lift,Tmp),
+    append(Tmp,EImp,Imports),
+    imp_acc_base(Imports,Base).
+imp_acc_base([H|T],Base) :-
+    (exp_acc_base(H,Base) -> (true, !)
+     ; imp_acc_base(T,Base)
+    ).
+
+% Constr is constr(Name,Nr)
+exp_acc_constr(ModName,Constr) :-
+    ast(ModName,exp(_,lang(_,EConstr,_,_,_,_),_),_),
+    member(Constr,EConstr), !.
+exp_acc_constr(ModName,Constr) :-
+    ast(ModName,exp(EImp,_,_),_),
+    imp_acc_constr(EImp,Constr).
+loc_acc_constr(ModName,Constr) :-
+    ast(ModName,exp(_,lang(_,EConstr,_,_,_,_),_),loc(_,_,lang(_,LConstr,_,_,_,_),_,_)),
+    append(LConstr,EConstr,Constrs),
+    member(Constr,Constrs), !.
+loc_acc_constr(ModName,Constr) :-
+    ast(ModName,exp(EImp,_,_),loc(LImp,Lift,_,_,_)),
+    append(LImp,Lift,Tmp),
+    append(Tmp,EImp,Imports),
+    imp_acc_constr(Imports,Constr).
+imp_acc_constr([H|T],Constr) :-
+    (exp_acc_constr(H,Constr) -> (true, !)
+     ; imp_acc_constr(T,Constr)
+    ).
+
+
+
 /* ----------------- */
 /* helper predicates */
 /* ----------------- */
