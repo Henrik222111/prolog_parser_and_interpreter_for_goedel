@@ -1,0 +1,1 @@
+MODULE		Mem.BASE		Alpha.CONSTRUCTOR	List/1.CONSTANT	Nil: List(Alpha);		A,B,C,D,E,F,G,H,I,J,K,L,M,N,O,P,Q,R,S: Alpha.FUNCTION	Cons: Alpha * List(Alpha) -> List(Alpha).PREDICATE	Member: Alpha * List(Alpha).Member(x,Cons(x,_tail)).Member(x,Cons(_h,tail)) <-	Member(x,tail).

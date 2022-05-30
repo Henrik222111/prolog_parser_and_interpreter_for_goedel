@@ -1,7 +1,6 @@
 % author: Henrik Hinzmann
 
 % TODOs
-% import export in module must be same name
 % No Module may depend upon itself.
 % integer and float constant is treated specially (const_decl)
 % func_decl declaration must be transparent
@@ -10,19 +9,29 @@
 % range_formula
 % list
 % set
+% pruning
 
+% Example files have to be in prolog working directory
+parse1 :- parse_file('Chapter_2_M1.loc'), print_ast.
+parse2 :- parse_file('Mem.loc'), print_ast.
+parse3 :- parse_file('Flounder.loc'), print_ast.
+
+print_ast :- ast(Name,Exp,Loc),format('ast(~w,~w,~w)~n',[Name,Exp,Loc]).
+
+% File has to be in prolog working directory
 parse_file(File) :-
-    format('Parsing Gödel file: ~w~n', [File]),
-    open(File,read,Stream),
+    absolute_file_name(File,AF,[]),
+    format('Parsing Gödel file: ~w~n', [AF]),
+    open(AF,read,Stream),
     set_stream(Stream,newline(posix)),
     set_input(Stream),
     read_file(Txt),
     close(Stream),
     reset, %trace,
     program(Txt,[]),
-    format('end '), print_line_count, !.
+    format('finished '), print_line_count, format('~n'), !.
 parse_file(_File) :-
-    format('fail '), print_line_count.
+    format('failed '), print_line_count, format('~n').
 
 read_file(Txt) :-
     get_code(CharCode),
@@ -543,11 +552,11 @@ term(nr(Nr)) --> number(Nr), !.
 term(str(Str)) --> string(Str), !.
 %term --> list.
 %term --> set.
-term(Term) --> "(", !, term(Term), ")".
-term(Term) --> user_name(Name), term_end(Name,Term).
-term_end(Name,func(Name,N,[Term|Terms])) --> "(", !, term(Term), opt_terms(1,N,Terms), ")".
+term(Term) --> "(", !, optws, term(Term), optws, ")".
+term(Term) --> user_name(Name), optws, term_end(Name,Term).
+term_end(Name,func(Name,N,[Term|Terms])) --> "(", !, optws, term(Term), optws, opt_terms(1,N,Terms), ")".
 term_end(Name,cons(Name)) --> "".
-opt_terms(C,N,[Term|Terms]) --> comma, !, term(Term), {C1 is C+1}, opt_terms(C1,N,Terms).
+opt_terms(C,N,[Term|Terms]) --> comma, !, optws, term(Term), optws, {C1 is C+1}, opt_terms(C1,N,Terms).
 opt_terms(N,N,Terms) --> {Terms=[]}.
 /* Can be later used for Lists
 list --> "[", list_mid, "]".
@@ -747,7 +756,7 @@ pred_list([],_,_,_,[]).
 /* ------------- */
 
 ws --> layout_item(_Ch), optws.
-optws --> layout_item(_Ch), optws.
+optws --> layout_item(_Ch), !, optws.
 optws --> "".
 
 :- dynamic cur_line_number/1.
@@ -755,7 +764,7 @@ cur_line_number(1).
 
 print_line_count :-
     cur_line_number(N),
-    print('at line '), print(N), print(' ').
+    format('at line ~w',[N]).
 
 increment_line_count :-
     retract(cur_line_number(N)),

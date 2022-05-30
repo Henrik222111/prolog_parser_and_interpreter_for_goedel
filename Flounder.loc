@@ -1,0 +1,1 @@
+MODULE		Flounder.BASE		Int.CONSTANT	Zero: Int.FUNCTION	S: Int -> Int.PREDICATE	TestInt: Int.PROPOSITION	TestInt2.PREDICATE	Ni : Int.PREDICATE	Ni2 : Int.TestInt(Zero).TestInt(S(x)) <- TestInt(x).Ni(x) <- ~ TestInt(z).TestInt2.TestInt2 <- TestInt2.Ni2(x) <- ~ TestInt2.
