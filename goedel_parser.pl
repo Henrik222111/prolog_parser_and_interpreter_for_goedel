@@ -471,12 +471,17 @@ cformula_0_end(-1) --> "". */
 cformula_0_f(Form) --> cformula_2(Form), !.
 cformula_0_f(Form) --> cformula_0(Form), !.
 cformula_0_f(Form) --> cformula_f(Form).
-cformula_2(and(Form1,Form2)) --> cformula_0(Form1), !, optws, "&", optws, cformula_2_end(Form2).
-cformula_2(and(Form1,Form2)) --> formula_1(Form1), !, optws, "&", optws, cformula_2_end(Form2).
-cformula_2(and(Form1,Form2)) --> formula_0(Form1), optws, "&", optws, cformula_2_end(Form2).
-cformula_2_end(Form) --> cformula_2(Form).
-cformula_2_end(Form) --> cformula_0(Form).
-cformula_2_end(Form) --> formula_2(Form), !.
+cformula_2(Form) --> cformula_0(Form1), !, optws, cformula_2_mid(Form1,Form).
+cformula_2(Form) --> formula_1(Form1), !, optws, cformula_2_mid(Form1,Form).
+cformula_2(Form) --> formula_0(Form1), optws, cformula_2_mid(Form1,Form).
+cformula_2_mid(Form1,Form) --> "&", optws, cformula_2_and(Form1,Form).
+cformula_2_and(Form1,Form) --> cformula_0(Form2), optws, cformula_2_mid(and(Form1,Form2),Form), !.
+cformula_2_and(Form1,Form) --> formula_2(Form2), optws, cformula_2_mid(and(Form1,Form2),Form), !.
+cformula_2_and(Form1,Form) --> formula_1(Form2), optws, cformula_2_mid(and(Form1,Form2),Form), !.
+cformula_2_and(Form1,Form) --> formula_0(Form2), optws, cformula_2_mid(and(Form1,Form2),Form), !.
+cformula_2_and(Form1,Form) --> cformula_2_end(Form2), {Form=and(Form1,Form2)}.
+cformula_2_end(Form) --> cformula_0(Form), !.
+cformula_2_end(Form) --> formula_2(Form), !. % "&" is filtered
 cformula_2_end(Form) --> formula_1(Form), !.
 cformula_2_end(Form) --> formula_0(Form).
 cformula_f(Form) --> formula_4(Form), !.
@@ -499,10 +504,14 @@ formula_1(all(Vars,Form)) --> "ALL", optws, "[", optws, variable_seq(Vars), optw
     formula_1_end(Form), optws.
 formula_1_end(Form) --> formula_1(Form).
 formula_1_end(Form) --> formula_0(Form).
-formula_2(and(Form1,Form2)) --> formula_1(Form1), !, optws, "&", optws, formula_2_end(Form2), optws.
-formula_2(and(Form1,Form2)) --> formula_0(Form1), !, optws, "&", optws, formula_2_end(Form2), optws.
+formula_2(Form) --> formula_1(Form1), !, optws, formula_2_mid(Form1,Form), optws.
+formula_2(Form) --> formula_0(Form1), !, optws, formula_2_mid(Form1,Form), optws.
 formula_2(Form) --> "IF", optws, formula_2_mid(If), optws, "THEN", optws,
     then_part(Then), formula_2_else(If,Then,Form).
+formula_2_mid(Form1,Form) --> "&", optws, formula_2_and(Form1,Form).
+formula_2_and(Form1,Form) --> formula_1(Form2), optws, formula_2_mid(and(Form1,Form2),Form), !.
+formula_2_and(Form1,Form) --> formula_0(Form2), optws, formula_2_mid(and(Form1,Form2),Form), !.
+formula_2_and(Form1,Form) --> formula_2_end(Form2), {Form=and(Form1,Form2)}. % "&" is filtered
 formula_2_end(Form) --> formula_2(Form), !.
 formula_2_end(Form) --> formula_1(Form), !.
 formula_2_end(Form) --> formula_0(Form).
@@ -511,10 +520,14 @@ formula_2_mid(some(Vars,Form)) --> "SOME", !, optws, "[", optws, variable_seq(Va
 formula_2_mid(Form) --> formula_f(Form).
 formula_2_else(If,Then,if(If,Then,Else)) --> "ELSE", !, optws, formula_2_end(Else).
 formula_2_else(If,Then,Form) --> {Form=if(If,Then)}.
-formula_3(or(Form1,Form2)) --> formula_2(Form1), !, optws, "\\/", optws, formula_3_end(Form2), optws.
-formula_3(or(Form1,Form2)) --> formula_1(Form1), !, optws, "\\/", optws, formula_3_end(Form2), optws.
-formula_3(or(Form1,Form2)) --> formula_0(Form1), optws, "\\/", optws, formula_3_end(Form2), optws.
-formula_3_end(Form) --> formula_3(Form), !.
+formula_3(Form) --> formula_2(Form1), !, optws, formula_3_mid(Form1,Form), optws.
+formula_3(Form) --> formula_1(Form1), !, optws, formula_3_mid(Form1,Form), optws.
+formula_3(Form) --> formula_0(Form1), optws, formula_3_mid(Form1,Form), optws.
+formula_3_mid(Form1,Form) --> "\\/", optws, formula_3_or(Form1,Form).
+formula_3_or(Form1,Form) --> formula_2(Form2), optws, formula_3_mid(or(Form1,Form2),Form), !.
+formula_3_or(Form1,Form) --> formula_1(Form2), optws, formula_3_mid(or(Form1,Form2),Form), !.
+formula_3_or(Form1,Form) --> formula_0(Form2), optws, formula_3_mid(or(Form1,Form2),Form), !.
+formula_3_or(Form1,Form) --> formula_3_end(Form2), {Form=or(Form1,Form2)}.
 formula_3_end(Form) --> formula_2(Form), !.
 formula_3_end(Form) --> formula_1(Form), !.
 formula_3_end(Form) --> formula_0(Form).
@@ -522,9 +535,19 @@ formula_4(Form) --> formula_3(Form1), !, optws, formula_4_mid(Form1,Form), optws
 formula_4(Form) --> formula_2(Form1), !, optws, formula_4_mid(Form1,Form), optws.
 formula_4(Form) --> formula_1(Form1), !, optws, formula_4_mid(Form1,Form), optws.
 formula_4(Form) --> formula_0(Form1), optws, formula_4_mid(Form1,Form), optws.
-formula_4_mid(Form1,rImpl(Form1,Form2)) --> "<-", !, optws, formula_f(Form2).
-formula_4_mid(Form1,lImpl(Form1,Form2)) --> "->", !, optws, formula_f(Form2).
-formula_4_mid(Form1,equi(Form1,Form2)) --> "<->", optws, formula_4_end(Form2).
+formula_4_rlImpl(Form1,Form) --> formula_3(Form2), optws, formula_4_mid(rlImpl(Form1,Form2),Form), !.
+formula_4_rlImpl(Form1,Form) --> formula_2(Form2), optws, formula_4_mid(rlImpl(Form1,Form2),Form), !.
+formula_4_rlImpl(Form1,Form) --> formula_1(Form2), optws, formula_4_mid(rlImpl(Form1,Form2),Form), !.
+formula_4_rlImpl(Form1,Form) --> formula_0(Form2), optws, formula_4_mid(rlImpl(Form1,Form2),Form), !.
+formula_4_rlImpl(Form1,Form) --> formula_4_end(Form2), {Form=rlImpl(Form1,Form2)}.
+formula_4_lrImpl(Form1,Form) --> formula_3(Form2), optws, formula_4_mid(lrImpl(Form1,Form2),Form), !.
+formula_4_lrImpl(Form1,Form) --> formula_2(Form2), optws, formula_4_mid(lrImpl(Form1,Form2),Form), !.
+formula_4_lrImpl(Form1,Form) --> formula_1(Form2), optws, formula_4_mid(lrImpl(Form1,Form2),Form), !.
+formula_4_lrImpl(Form1,Form) --> formula_0(Form2), optws, formula_4_mid(lrImpl(Form1,Form2),Form), !.
+formula_4_lrImpl(Form1,Form) --> formula_4_end(Form2), {Form=lrImpl(Form1,Form2)}.
+formula_4_mid(Form1,equi(Form1,Form2)) --> "<->", !, optws, formula_4_end(Form2).
+formula_4_mid(Form1,Form) --> "<-", !, optws, formula_4_rlImpl(Form1,Form).
+formula_4_mid(Form1,Form) --> "->", optws, formula_4_lrImpl(Form1,Form).
 formula_4_end(Form) --> formula_3(Form), !.
 formula_4_end(Form) --> formula_2(Form), !.
 formula_4_end(Form) --> formula_1(Form), !.
@@ -616,7 +639,7 @@ imp_acc_base([H|T],Base) :-
      ; imp_acc_base(T,Base)
     ).
 
-% Constr is constr(Name,Nr)
+% Constr is constr(Name,Arity)
 exp_acc_constr(ModName,Constr) :-
     ast(ModName,exp(_,lang(_,EConstr,_,_,_,_),_),_),
     member(Constr,EConstr), !.
@@ -635,6 +658,48 @@ loc_acc_constr(ModName,Constr) :-
 imp_acc_constr([H|T],Constr) :-
     (exp_acc_constr(H,Constr) -> (true, !)
      ; imp_acc_constr(T,Constr)
+    ).
+
+% Const is Name
+exp_acc_func(ModName,Const) :-
+    ast(ModName,exp(_,lang(_,_,EConst,_,_,_),_),_),
+    member(Const,EConst), !.
+exp_acc_func(ModName,Const) :-
+    ast(ModName,exp(EImp,_,_),_),
+    imp_acc_constr(EImp,Const).
+loc_acc_func(ModName,Const) :-
+    ast(ModName,exp(_,lang(_,_,EConst,_,_,_),_),loc(_,_,lang(_,_,LConst,_,_,_),_,_)),
+    append(LConst,EConst,Consts),
+    member(Const,Consts), !.
+loc_acc_func(ModName,Const) :-
+    ast(ModName,exp(EImp,_,_),loc(LImp,Lift,_,_,_)),
+    append(LImp,Lift,Tmp),
+    append(Tmp,EImp,Imports),
+    imp_acc_constr(Imports,Const).
+imp_acc_func([H|T],Const) :-
+    (exp_acc_constr(H,Const) -> (true, !)
+     ; imp_acc_constr(T,Const)
+    ).
+
+% Func is func(Name,Arity,Types,Range,Type)
+exp_acc_const(ModName,Const) :-
+    ast(ModName,exp(_,lang(_,_,EConst,_,_,_),_),_),
+    member(Const,EConst), !.
+exp_acc_const(ModName,Const) :-
+    ast(ModName,exp(EImp,_,_),_),
+    imp_acc_constr(EImp,Const).
+loc_acc_const(ModName,Const) :-
+    ast(ModName,exp(_,lang(_,_,EConst,_,_,_),_),loc(_,_,lang(_,_,LConst,_,_,_),_,_)),
+    append(LConst,EConst,Consts),
+    member(Const,Consts), !.
+loc_acc_const(ModName,Const) :-
+    ast(ModName,exp(EImp,_,_),loc(LImp,Lift,_,_,_)),
+    append(LImp,Lift,Tmp),
+    append(Tmp,EImp,Imports),
+    imp_acc_constr(Imports,Const).
+imp_acc_const([H|T],Const) :-
+    (exp_acc_constr(H,Const) -> (true, !)
+     ; imp_acc_constr(T,Const)
     ).
 
 
