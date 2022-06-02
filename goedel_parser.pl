@@ -16,7 +16,14 @@ parse1 :- parse_file('Chapter_2_M1.loc'), print_ast.
 parse2 :- parse_file('Mem.loc'), print_ast.
 parse3 :- parse_file('Flounder.loc'), print_ast.
 
-print_ast :- ast(Name,Exp,Loc),format('ast(~w,~w,~w)~n',[Name,Exp,Loc]).
+print_ast :- ast(Name,Exp,Loc),write('ast('), print_quoted(Name), write(','), print_quoted(Exp),
+    write(','), print_quoted(Loc), write(')~n').
+
+% From Prof. Micheal Leuschel
+print_quoted(X) :- write_term(X,
+                            [quoted(true),ignore_ops(true),
+                             max_depth(0),
+                             numbervars(true),portrayed(true)]).
 
 % File has to be in prolog working directory
 parse_file(File) :-
@@ -815,6 +822,7 @@ func_list([],_,_,_,_,_,[]).
 pred_list([H|T],N,Spec,Types,[pred(H,N,Spec,Types)|R]) :-
     pred_list(T,N,Spec,Types,R).
 pred_list([],_,_,_,[]).
+
 
 /* ------------- */
 /* line counting */
