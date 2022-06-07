@@ -1,0 +1,18 @@
+MODULE		M2.
+
+BASE		Day.
+CONSTRUCTOR	List/1.
+
+CONSTANT	Nil : List(Day);
+		Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday :
+		Day.
+FUNCTION 	Cons : Day * List(Day) -> List(Day).
+PREDICATE 	Append : List(Day) * List(Day) * List(Day);
+		Append3 : List(Day) * List(Day) * List(Day) * List(Day).
+
+Append(Nil,x,x).
+Append(Cons(u,x),y,Cons(u,z)) <-
+		Append(x,y,z).
+Append3(x,y,z,u) <-
+		Append(x,y,w) &
+		Append(w,z,u).

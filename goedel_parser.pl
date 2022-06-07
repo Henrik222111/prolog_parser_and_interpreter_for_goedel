@@ -1,7 +1,6 @@
 % author: Henrik Hinzmann
 
 % TODOs
-% No Module may depend upon itself.
 % integer and float constant is treated specially (const_decl)
 % func_decl declaration must be transparent
 
@@ -12,12 +11,14 @@
 % pruning
 
 % Example files have to be in prolog working directory
-parse1 :- parse_file('Chapter_2_M1.loc'), print_ast.
-parse2 :- parse_file('Mem.loc'), print_ast.
-parse3 :- parse_file('Flounder.loc'), print_ast.
+parse1 :- parse_file('Chapter_2_M1.loc'), nl, print_ast.
+parse2 :- parse_file('Mem.loc'), nl, print_ast.
+parse3 :- parse_file('Flounder.loc'), nl, print_ast.
+parse4 :- parse_file('Chapter_2_M2.loc'), nl, print_ast.
+parsetest :- parse_file('Test.loc'), nl, print_ast.
 
 print_ast :- ast(Name,Exp,Loc),write('ast('), print_quoted(Name), write(','), print_quoted(Exp),
-    write(','), print_quoted(Loc), write(')~n').
+    write(','), print_quoted(Loc), write(')'), nl.
 
 % From Prof. Micheal Leuschel
 print_quoted(X) :- write_term(X,
@@ -36,9 +37,11 @@ parse_file(File) :-
     close(Stream),
     reset, %trace,
     program(Txt,[]),
-    format('finished '), print_line_count, format('~n'), !.
+    check_types,
+    format('finished parsing '), print_line_count, format('~n'), !.
 parse_file(_File) :-
-    format('failed '), print_line_count, format('~n').
+    (checked('type error') -> fail; format('failed parsing '), print_line_count, format('~n')),
+    fail.
 
 read_file(Txt) :-
     get_code(CharCode),
@@ -217,7 +220,6 @@ opt_string_character(Prev,Str) --> string_character(Ch), !,
 opt_string_character(Prev,Str) --> {Prev=Str}.
 string_character('\\') --> "\\\\", !.
 string_character('\"')--> "\\\"", !.
-% does not work TODO
 string_character('\t') --> "\\t", !.
 string_character('\r') --> "\\r", !.
 string_character('\n') --> "\\n", !.
@@ -328,14 +330,14 @@ opt_export_item(ModName) --> export_item(ModName), !, optws, opt_export_item(Mod
 opt_export_item(_ModName) --> "".
 export_item(ModName) --> import_decl(Imports), !, {add_exp_imports(ModName,Imports)},
     optws, terminator, optws.
-export_item(ModName) --> language_decl(ModName), !, optws, terminator, optws.
+export_item(ModName) --> language_decl(ModName,exp), !, optws, terminator, optws.
 export_item(ModName) --> control_decl(Controls), {add_exp_controls(ModName,Controls)},
     optws, terminator, optws.
 opt_module_local_item(ModName) --> module_local_item(ModName), !, optws, opt_module_local_item(ModName).
 opt_module_local_item(_ModName) --> "".
 module_local_item(ModName) --> import_decl(Imports), !, {add_loc_imports(ModName,Imports)},
     optws, terminator, optws.
-module_local_item(ModName) --> language_decl(ModName), !, optws, terminator, optws.
+module_local_item(ModName) --> language_decl(ModName,loc), !, optws, terminator, optws.
 module_local_item(ModName) --> control_decl(Controls), !, {add_loc_controls(ModName,Controls)},
     optws, terminator, optws.
 module_local_item(ModName) --> statement(Statement), {add_statement(ModName,Statement)},
@@ -347,17 +349,17 @@ local_local_item(ModName) --> lift_decl(Lifts), {add_lifts(ModName,Lifts)}, optw
 import_decl([Name|Names]) --> "IMPORT", !, ws,  module_name(Name), optws, opt_module_names(Names).
 % only if module has export part
 lift_decl([Name|Names]) --> "LIFT", !, ws, module_name(Name), optws, opt_module_names(Names).
-% No Module may depend upon itself. %%TODO
+% No Module may depend upon itself.
 
 
 % Language Declarations
-language_decl(ModName) --> base_decl(Bases), {add_bases(ModName,Bases)}.
-language_decl(ModName) --> constructor_decl(Constrs), {add_constrs(ModName,Constrs)}.
-language_decl(ModName) --> constant_decl(Consts), {add_consts(ModName,Consts)}.
-language_decl(ModName) --> function_decl(Funcs), {add_funcs(ModName,Funcs)}.
-language_decl(ModName) --> proposition_decl(Props), {add_props(ModName,Props)}.
-language_decl(ModName) --> predicate_decl(Preds), {add_preds(ModName,Preds)}.
-%List of Base names
+language_decl(ModName,Part) --> base_decl(Bases), {add_bases(ModName,Part,Bases)}.
+language_decl(ModName,Part) --> constructor_decl(Constrs), {add_constrs(ModName,Part,Constrs)}.
+language_decl(ModName,Part) --> constant_decl(Consts), {add_consts(ModName,Part,Consts)}.
+language_decl(ModName,Part) --> function_decl(Funcs), {add_funcs(ModName,Part,Funcs)}.
+language_decl(ModName,Part) --> proposition_decl(Props), {add_props(ModName,Part,Props)}.
+language_decl(ModName,Part) --> predicate_decl(Preds), {add_preds(ModName,Part,Preds)}.
+% List of Base names
 base_decl(Bases) --> "BASE", !, optws, user_name_seq(Names), {Bases=Names}.
 % List of constr(Name,Arity)
 constructor_decl([Constr|Constrs]) --> "CONSTRUCTOR", !,  optws, constr_decl(Constr), optws,
@@ -374,14 +376,14 @@ opt_const_decl(Consts) --> semicolon, !, optws, const_decl(Consts1), optws, opt_
 opt_const_decl(Consts) --> {Consts=[]}.
 const_decl(Consts) --> user_name_seq(Names), ":", optws, type(Type), optws,
     {const_list(Names,Type,Consts)}.
-%integer and float constant is treated specially %%TODO
+% integer and float constant is treated specially %%TODO
 % List of func(Name,Arity,Spec,Prio,List of Types,Rangetype)
 function_decl(Funcs) --> "FUNCTION", !, ws, func_decl(Funcs1), optws, opt_func_decls(Funcs2),
     {append(Funcs1,Funcs2,Funcs)}.
 opt_func_decls(Funcs) --> semicolon, !, optws, func_decl(Funcs1), optws,  opt_func_decls(Funcs2),
     {append(Funcs1,Funcs2,Funcs)}.
 opt_func_decls(Funcs) --> {Funcs=[]}.
-% declaration must be transparent %%TODO
+% declaration must be transparent
 func_decl(Funcs) --> user_name_seq(Names),  ":", optws, func_decl_end(Spec,Prio,Types,Range),
     {length(Types,N),func_list(Names,N,Spec,Prio,Types,Range,Funcs)}.
 func_decl_end(Spec,Nr,[Type],Range) --> function_spec_1(Spec), !, optws,
@@ -441,7 +443,7 @@ opt_constr_types(C,N,Types) --> {N=C, Types=[]}.
 % Control Declarations
 control_decl([Delay|Delays]) --> "DELAY", optws, cont_decl(Delay), optws, opt_cont_decls(Delays).
 % only in module where predicate is declared
-opt_cont_decls([Delay|Delays]) --> cont_decl(Delay), !, optws, opt_cont_decls(Delays).
+opt_cont_decls([Delay|Delays]) --> semicolon, !, optws, cont_decl(Delay), optws, opt_cont_decls(Delays).
 opt_cont_decls(Delays) --> {Delays=[]}.
 % atom cannot be a proposition, no atom pair in delay set can have a
 % common instance
@@ -465,7 +467,7 @@ or_seq_end(Cond1,Cond) --> {Cond=Cond1}.
 % Statements
 statement(Stm) --> optws, goedel_atom(Head), optws, statement_end(Head,Stm).
 statement_end(Head,stm(Head,Body)) --> "<-", !, optws, body(Body).
-statement_end(Head,Stm) --> {Stm=stm(Head)}.
+statement_end(Head,Stm) --> {Stm=stm(Head,true)}.
 % Pruning cann be added later with "|"
 body(Form) --> cformula_2(Form), !.
 body(Form) --> cformula_0(Form), !.
@@ -562,7 +564,6 @@ formula_4_end(Form) --> formula_0(Form).
 then_part(if(If,Then)) --> "IF", !, optws, formula_f(If), optws, "THEN", optws , then_part(Then), optws.
 then_part(Form) --> formula_1(Form1), !, optws, then_part_end(Form1,Form), optws.
 then_part(Form) --> formula_0(Form1), optws, then_part_end(Form1,Form), optws.
-% TODO: Building and(A,and(B,C)) instead of and(and(A,B),C). Problem?
 then_part_end(Form1,and(Form1,Form2)) --> "&", !, optws, then_part(Form2).
 then_part_end(Form1,Form) --> {Form=Form1}.
 goedel_atom(not(eq(Term1,Term2))) --> term(Term1), "~=", !, term(Term2).
@@ -585,7 +586,7 @@ term(str(Str)) --> string(Str), !.
 term(Term) --> "(", !, optws, term(Term), optws, ")".
 term(Term) --> user_name(Name), optws, term_end(Name,Term).
 term_end(Name,func(Name,N,[Term|Terms])) --> "(", !, optws, term(Term), optws, opt_terms(1,N,Terms), ")".
-term_end(Name,cons(Name)) --> "".
+term_end(Name,const(Name)) --> "".
 opt_terms(C,N,[Term|Terms]) --> comma, !, optws, term(Term), optws, {C1 is C+1}, opt_terms(C1,N,Terms).
 opt_terms(N,N,Terms) --> {Terms=[]}.
 /* Can be later used for Lists
@@ -621,11 +622,198 @@ variable_end(Name) --> {Name=''}.
 /* ------------ */
 /* Type Checker */
 /* ------------ */
+:- dynamic curr/2. % used to track ModuleName and Part while type checking
+:- dynamic checked/1. % used to catch type errors
 
-check_types :-
+reset_curr :-
+    retractall(curr(_,_)).
+set_curr(ModName,Part) :-
+    retractall(curr(_,_)),
+    assert(curr(ModName,Part)).
+reset_checked :-
+    retractall(checked(_)),
+    assert(checked('no type errors')).
+fail_checked :-
+    retract(checked(_)),
+    assert(checked('type error')),
     fail.
 
+check_types :-
+    reset_curr,
+    check_routine,
+    (checked('no type errors') -> true; fail).
+check_routine :-
+    ast(ModName,exp(_,ELang,EContrl),loc(_,_,LLang,LContrl,Stms)),
+    ELang=lang(_,_,EConst,EFunc,_,EPred),
+    LLang=lang(_,_,LConst,LFunc,_,LPred),
+    format('~nStarting type checking Module: ~w~n',[ModName]),
+    check_imports(ModName,[]),
+    set_curr(ModName,exp),
+    check_consts(EConst),
+    check_funcs(EFunc),
+    check_preds(EPred),
+    check_contrls(EContrl),
+    set_curr(ModName,loc),
+    check_consts(LConst),
+    check_funcs(LFunc),
+    check_preds(LPred),
+    check_contrls(LContrl),
+    set_curr(ModName,non),
+    check_stms(Stms),
+    retractall(curr(_,_)),
+    format('Finished type checking~n~n'),
+    fail.
+check_routine.
+
+check_imports([],_) :- !.
+check_imports([H|T],C) :-
+    !, check_imports(H,C),
+    check_imports(T,C).
+check_imports(Name,C) :-
+    (\+member(Name,C) -> true
+     ; (write('Module cant import itself (looped): '), print_quoted(Name), nl, fail_checked)
+    ),
+    ast(Name,exp(EI,_,_),loc(LI,L,_,_,_)),
+    append(EI,LI,Tmp),
+    append(Tmp,L,Imports),
+    (\+member(Name,Imports) -> true
+     ; (write('Module cant import itself: '), print_quoted(Name), nl, fail_checked)
+    ),
+    check_imports(Imports,[Name|C]).
+% Constant cant have only a parameter as type
+check_consts([]) :- !.
+check_consts([const(_Name,Type)|T]) :- check(Type,type,[],_), check_consts(T).
+% Function cant have only a parameter as type
+% Function must be transparent
+check_funcs([]) :- !.
+check_funcs([func(Name,Arity,_,_,Types,Range)|T]) :-
+    check_terms(Types,_,[],Params1), check(Range,type,[],Params2),
+    (Params1=Params2 -> true
+     ; ( write('Function must be transparent: '), print_quoted(func(Name,Arity,Types,Range)),
+         nl, fail_checked
+       )
+    ),
+    check_funcs(T).
+check_preds([]) :- !.
+check_preds([pred(_,_,_,Types)|T]) :- check_terms(Types,_,[],_), check_preds(T).
+check_contrls(Contrls) :- check_contrls(Contrls,[]).
+check_contrls([],_) :- !.
+check_contrls([delay(pred(Name,Arity,Types),Cond)|T],I) :-
+    check(pred(Name,Arity,Types),predicate,[],Vars1),
+    check(Cond,predicate,[],Vars2),
+    (containing(Vars2,Vars1) -> true
+     ; ( write('Variables in delay condition must apear in Atom: '), print_quoted(pred(Name,Arity,Types)),
+          nl, fail_checked)
+    ),print_quoted(Types),nl,
+    lift_vars(Types,ITypes,[],_),
+    (\+member(pred(Name,Arity,ITypes),I) -> true
+     ; ( write('Delays cant have common instance: '), print_quoted(pred(Name,Arity,Types)),
+          nl, fail_checked)
+    ),
+    check_contrls(T,[pred(Name,Arity,ITypes)|I]).
+check_stms([]) :- !.
+check_stms([H|T]) :- check(H,stm), check_stms(T).
+
+containing([],_) :- !.
+containing([H|T],L) :- member(H,L), containing(T,L).
+% var(Name,Type) must be lifted to prolog variable
+lift_vars([],[]) --> !, [].
+lift_vars([H|T],[IH|IT]) --> !, lift_vars(H,IH), lift_vars(T,IT).
+lift_vars(var(Name),X) --> !, var_var(Name,X).
+lift_vars(X,X) --> !, [].
+var_var(Name,X,[],[sub(Name,X)]) :- !.
+var_var(Name,X,[sub(N,Y)|T1],[sub(N,Y)|T2]) :-
+    (Name==N -> (X=Y, T1=T2)
+     ; var_var(Name,X,T1,T2)
+    ).
+
+% An adaption of "A small demo of Hindley Milner Type Inference using
+% Unification" from Michael Leuschel
+% checking declarations
+check(par(Name),typePar) --> defined(Name), !.
+check(par(Name),typePar) --> !, add(Name). % tracks Parameters
+check(constr(Name,Arity,Terms),type) --> !, check_terms(Terms,_Types),
+    {acc_constr(Name,Arity) -> true
+     ; (write('Could not find Constr: '), print_quoted(constr(Name,Arity)), nl, fail_checked)
+    }.
+check(base(Name),type) --> !,
+    {acc_base(Name) -> true
+     ; (write('Could not find Base: '), print_quoted(base(Name)), nl, fail_checked)
+    }.
+% checking controls
+check(nvar(Name),predicate) --> defined(var(Name,_)), !.
+check(nvar(Name),predicate) --> !, add(var(Name,_)).
+check(grnd(Name),predicate) --> defined(var(Name,_)), !.
+check(grnd(Name),predicate) --> !, add(var(Name,_)).
+% checking statements
+check(stm(Head,Body),stm) --> !, check_head(Head), check(Body,predicate).
+check(var(Var),TVar) --> defined(var(Var,Type)), !, {TVar=Type}.
+check(var(Var),TVar) --> !, add(var(Var,TVar)). % creates fresh variable
+check(fl(_Fl),'Float') --> !, [].
+check(nr(_Nr),'Integer') --> !, [].
+check(str(_Str),'Sring') --> !, [].
+check(func(Name,Arity,Terms),T) --> !, check_terms(Terms,Types),
+    {acc_func(Name,Arity,Types,T) -> true
+     ; (write('Could not find Function: '), print_quoted(func(Name,Arity,Types,T)), nl, fail_checked)
+    }.
+check(const(Name),T) --> !,
+    {acc_const(Name,T) -> true
+     ; (write('Could not find Constant: '), print_quoted(const(Name,T)), nl, fail_checked)
+    }.
+check(true,predicate) --> !, [].
+check(false,predicate) --> !, [].
+check(and(A,B),predicate) --> !, check(A,predicate), check(B,predicate).
+check(or(A,B),predicate) --> !, check(A,predicate), check(B,predicate).
+check(not(A),predicate) --> !, check(A,predicate).
+check(rlImpl(A,B),predicate) --> !, check(A,predicate), check(B,predicate).
+check(lrImpl(A,B),predicate) --> !, check(A,predicate), check(B,predicate).
+check(equi(A,B),predicate) --> !, check(A,predicate), check(B,predicate).
+check(eq(A,B),predicate) --> !, check(A,TA), check(B,TA).
+check(pred(Name,Arity,Terms),predicate) --> !, check_terms(Terms,Types),
+    {acc_pred(Name,Arity,Types) -> true
+     ; (write('Could not find Predicate: '), print_quoted(pred(Name,Arity,Types)), nl, fail_checked)
+    }.
+check(prop(Name),predicate) --> !,
+    {acc_prop(Name) -> true
+     ; (write('Could not finnd Proposition: '), print_quoted(prop(Name)), nl, fail_checked)
+    }.
+check(some(_Vars,Expr),predicate) --> !, check(Expr,predicate).
+check(all(_Vars,Expr),predicate) --> !, check(Expr,predicate).
+check(if(A,B,C),predicate) --> check(A,predicate), check(B,predicate), check(C,predicate).
+check(if(A,B), predicate) --> check(A,predicate), check(B,predicate).
+check(Expr,T,Env,_) :- nonvar(T), !, format('Type error: ~w  (Expected: ~w, Env: ~w)~n',[Expr,T,Env]),
+    fail_checked.
+check(Expr,_,Env,_) :- format('Illegal expression: ~w  (Env: ~w)~n',[Expr,Env]), fail_checked.
+check_head(pred(Name,Arity,Terms)) --> !,
+    {get_pred(Name,Arity,Types) -> true
+     ; (write('Could not find Predicate: '), print_quoted(pred(Name,Arity,Types)), nl, fail_checked)
+    },
+    check_terms(Terms,Types).
+check_head(prop(Name)) --> !,
+    {get_prop(Name) -> true
+     ; (write('Could not finnd Proposition: '), print_quoted(prop(Name)), nl, fail_checked)
+    }.
+check_head(Expr) --> {format('Illegal head expression: ~w~n',[Expr]), fail_checked}.
+check_terms([],[]) --> !, [].
+check_terms([H|T],[HT|Types]) --> check(H,HT), check_terms(T,Types).
+
+defined(X,Env,Env) :- member(X,Env).
+add(X,Env,[X|Env]).
+
+check(Expr,Result) :- check(Expr,Result,[],Env), write('Typing env: '), portray_clause(Env).
+
+
+/* --------------- */
+/* Checking access */
+/* --------------- */
+
 % Base is Name
+acc_base(Base) :-
+    curr(ModName,Part),
+    (Part=non -> fail; true),
+    (Part=exp -> exp_acc_base(ModName,Base)
+     ; loc_acc_base(ModName,Base)
+    ).
 exp_acc_base(ModName,Base) :-
     ast(ModName,exp(_,lang(EBase,_,_,_,_,_),_),_),
     member(Base,EBase), !.
@@ -647,6 +835,12 @@ imp_acc_base([H|T],Base) :-
     ).
 
 % Constr is constr(Name,Arity)
+acc_constr(Name,Arity) :-
+    curr(ModName,Part),
+    (Part=non -> fail; true),
+    (Part=exp -> exp_acc_constr(ModName,constr(Name,Arity))
+     ; loc_acc_constr(ModName,constr(Name,Arity))
+    ).
 exp_acc_constr(ModName,Constr) :-
     ast(ModName,exp(_,lang(_,EConstr,_,_,_,_),_),_),
     member(Constr,EConstr), !.
@@ -668,33 +862,21 @@ imp_acc_constr([H|T],Constr) :-
     ).
 
 % Const is Name
-exp_acc_func(ModName,Const) :-
-    ast(ModName,exp(_,lang(_,_,EConst,_,_,_),_),_),
-    member(Const,EConst), !.
-exp_acc_func(ModName,Const) :-
-    ast(ModName,exp(EImp,_,_),_),
-    imp_acc_constr(EImp,Const).
-loc_acc_func(ModName,Const) :-
-    ast(ModName,exp(_,lang(_,_,EConst,_,_,_),_),loc(_,_,lang(_,_,LConst,_,_,_),_,_)),
-    append(LConst,EConst,Consts),
-    member(Const,Consts), !.
-loc_acc_func(ModName,Const) :-
-    ast(ModName,exp(EImp,_,_),loc(LImp,Lift,_,_,_)),
-    append(LImp,Lift,Tmp),
-    append(Tmp,EImp,Imports),
-    imp_acc_constr(Imports,Const).
-imp_acc_func([H|T],Const) :-
-    (exp_acc_constr(H,Const) -> (true, !)
-     ; imp_acc_constr(T,Const)
-    ).
-
-% Func is func(Name,Arity,Types,Range,Type)
+acc_const(Const,T) :-
+    curr(ModName,Part),
+    (Part=non -> fail; true),
+    (Part=exp -> exp_acc_const(ModName,const(Const,PT))
+     ; loc_acc_const(ModName,const(Const,PT))
+    ),
+    lift_params(PT,ITypes,[],_),
+    ITypes=T.
+% Const is const(Name,Type)
 exp_acc_const(ModName,Const) :-
     ast(ModName,exp(_,lang(_,_,EConst,_,_,_),_),_),
     member(Const,EConst), !.
 exp_acc_const(ModName,Const) :-
     ast(ModName,exp(EImp,_,_),_),
-    imp_acc_constr(EImp,Const).
+    imp_acc_const(EImp,Const).
 loc_acc_const(ModName,Const) :-
     ast(ModName,exp(_,lang(_,_,EConst,_,_,_),_),loc(_,_,lang(_,_,LConst,_,_,_),_,_)),
     append(LConst,EConst,Consts),
@@ -703,12 +885,127 @@ loc_acc_const(ModName,Const) :-
     ast(ModName,exp(EImp,_,_),loc(LImp,Lift,_,_,_)),
     append(LImp,Lift,Tmp),
     append(Tmp,EImp,Imports),
-    imp_acc_constr(Imports,Const).
+    imp_acc_const(Imports,Const).
 imp_acc_const([H|T],Const) :-
-    (exp_acc_constr(H,Const) -> (true, !)
-     ; imp_acc_constr(T,Const)
+    (exp_acc_const(H,Const) -> (true, !)
+     ; imp_acc_const(T,Const)
     ).
 
+% Func is func(Name,Arity,Specifier,Prio,Types,RangeType)
+acc_func(Name,Arity,Types,T) :-
+    curr(ModName,Part),
+    (Part=non -> fail; true),
+    (Part=exp -> exp_acc_func(ModName,func(Name,Arity,_Spec,_Prio,PTypes,PT))
+     ; loc_acc_func(ModName,func(Name,Arity,_Spec,_Prio,PTypes,PT))
+    ),
+    lift_params(PTypes,ITypes,[],Sub),
+    lift_params(PT,IT,Sub,_),
+    ITypes=Types,
+    IT=T.
+exp_acc_func(ModName,Func) :-
+    ast(ModName,exp(_,lang(_,_,_,EFunc,_,_),_),_),
+    member(Func,EFunc), !.
+exp_acc_func(ModName,Func) :-
+    ast(ModName,exp(EImp,_,_),_),
+    imp_acc_func(EImp,Func).
+loc_acc_func(ModName,Func) :-
+    ast(ModName,exp(_,lang(_,_,_,EFunc,_,_),_),loc(_,_,lang(_,_,_,LFunc,_,_),_,_)),
+    append(LFunc,EFunc,Funcs),
+    member(Func,Funcs), !.
+loc_acc_func(ModName,Func) :-
+    ast(ModName,exp(EImp,_,_),loc(LImp,Lift,_,_,_)),
+    append(LImp,Lift,Tmp),
+    append(Tmp,EImp,Imports),
+    imp_acc_func(Imports,Func).
+imp_acc_func([H|T],Func) :-
+    (exp_acc_func(H,Func) -> (true, !)
+     ; imp_acc_func(T,Func)
+    ).
+
+% Prop is Name
+get_prop(Prop) :-
+    retract(curr(ModName,_)),
+    ast(ModName,exp(_,lang(_,_,_,_,EProp,_),_),loc(_,_,lang(_,_,_,_,LProp,_),_,_)),
+    (member(Prop,EProp) -> assert(curr(ModName,exp)); true),
+    (member(Prop,LProp) -> assert(curr(ModName,loc)); true),
+    curr(_,_). % Failing if both member failed
+acc_prop(Prop) :-
+    curr(ModName,Part),
+    (Part=non -> fail; true),
+    (Part=exp -> exp_acc_prop(ModName,Prop)
+     ; loc_acc_prop(ModName,Prop)
+    ).
+exp_acc_prop(ModName,Prop) :-
+    ast(ModName,exp(_,lang(_,_,_,_,EProp,_),_),_),
+    member(Prop,EProp), !.
+exp_acc_prop(ModName,Prop) :-
+    ast(ModName,exp(EImp,_,_),_),
+    imp_acc_prop(EImp,Prop).
+loc_acc_prop(ModName,Prop) :-
+    ast(ModName,exp(_,lang(_,_,_,_,EProp,_),_),loc(_,_,lang(_,_,_,_,LProp,_),_,_)),
+    append(LProp,EProp,Props),
+    member(Prop,Props), !.
+loc_acc_prop(ModName,Prop) :-
+    ast(ModName,exp(EImp,_,_),loc(LImp,Lift,_,_,_)),
+    append(LImp,Lift,Tmp),
+    append(Tmp,EImp,Imports),
+    imp_acc_prop(Imports,Prop).
+imp_acc_prop([H|T],Prop) :-
+    (exp_acc_prop(H,Prop) -> (true, !)
+     ; imp_acc_prop(T,Prop)
+    ).
+
+
+% Pred is pred(Name,Arity,Specifier,Types)
+
+get_pred(Name,Arity,Types) :-
+    retract(curr(ModName,_)),
+    ast(ModName,exp(_,lang(_,_,_,_,_,EPred),_),loc(_,_,lang(_,_,_,_,_,LPred),_,_)),
+    (member(pred(Name,Arity,_Spec1,PTypes),EPred) -> assert(curr(ModName,exp)); true),
+    (member(pred(Name,Arity,_Spec2,PTypes),LPred) -> assert(curr(ModName,loc)); true),
+    curr(_,_), % Failing if both member failed
+    lift_params(PTypes,ITypes,[],_),
+    ITypes=Types.
+acc_pred(Name,Arity,Types) :-
+    curr(ModName,Part),
+    (Part=non -> fail; true),
+    (Part=exp -> exp_acc_pred(ModName,pred(Name,Arity,_Spec,PTypes))
+     ; loc_acc_pred(ModName,pred(Name,Arity,_Spec,PTypes))
+    ),
+    lift_params(PTypes,ITypes,[],_),
+    ITypes=Types.
+exp_acc_pred(ModName,Pred) :-
+    ast(ModName,exp(_,lang(_,_,_,_,_,EPred),_),_),
+    member(Pred,EPred), !.
+exp_acc_pred(ModName,Pred) :-
+    ast(ModName,exp(EImp,_,_),_),
+    imp_acc_pred(EImp,Pred).
+loc_acc_pred(ModName,Pred) :-
+    ast(ModName,exp(_,lang(_,_,_,_,_,EPred),_),loc(_,_,lang(_,_,_,_,_,LPred),_,_)),
+    append(LPred,EPred,Preds),
+    member(Pred,Preds), !.
+loc_acc_pred(ModName,Pred) :-
+    ast(ModName,exp(EImp,_,_),loc(LImp,Lift,_,_,_)),
+    append(LImp,Lift,Tmp),
+    append(Tmp,EImp,Imports),
+    imp_acc_pred(Imports,Pred).
+imp_acc_pred([H|T],Func) :-
+    (exp_acc_pred(H,Func) -> (true, !)
+     ; imp_acc_pred(T,Func)
+    ).
+
+% par(Name) must be lifted to prolog variable
+% variable can than be unified with bases/constructors
+lift_params([],[]) --> !, [].
+lift_params([H|T],[IH|IT]) --> !, lift_params(H,IH), lift_params(T,IT).
+lift_params(par(Name),X) --> !, param_var(Name,X).
+lift_params(base(Name),base(Name)) --> !, [].
+lift_params(constr(Name,Arity,Args),constr(Name,Arity,IArgs)) --> !, lift_params(Args,IArgs).
+param_var(Name,X,[],[sub(Name,X)]) :- !.
+param_var(Name,X,[sub(N,Y)|T1],[sub(N,Y)|T2]) :-
+    (Name==N -> (X=Y, T1=T2)
+     ; param_var(Name,X,T1,T2)
+    ).
 
 
 /* ----------------- */
@@ -717,7 +1014,9 @@ imp_acc_const([H|T],Const) :-
 
 reset :-
     reset_line_count,
-    reset_ast.
+    reset_ast,
+    reset_checked,
+    reset_curr.
 
 :- dynamic ast/3.
 
@@ -767,47 +1066,142 @@ add_statement(ModName,Statement) :-
 
 % Adding Language Declarations to ast
 
-add_bases(ModName,Bases) :-
-    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
-    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
-    append(Base,Bases,New),
-    NewLang=lang(New,Constr,Const,Func,Prop,Pred),
-    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+add_bases(ModName,loc,Bases) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(LBase,LConstr,LConst,LFunc,LProp,LPred),
+    ELang=lang(EBase,_,_,_,_,_),
+    append(LBase,Bases,New),
+    append(New,EBase,All),
+    is_set(All), !,
+    NewLang=lang(New,LConstr,LConst,LFunc,LProp,LPred),
+    assert(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,NewLang,LCont,Stmnt))).
+add_bases(ModName,exp,Bases) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(LBase,_,_,_,_,_),
+    ELang=lang(EBase,EConstr,EConst,EFunc,EProp,EPred),
+    append(EBase,Bases,New),
+    append(New,LBase,All),
+    is_set(All), !,
+    NewLang=lang(New,EConstr,EConst,EFunc,EProp,EPred),
+    assert(ast(ModName,exp(EImp,NewLang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))).
+add_bases(ModName,_,_) :- format('Base double declared in module: ~w~n',[ModName]), fail.
 
-add_constrs(ModName,Constrs) :-
-    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
-    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
-    append(Constr,Constrs,New),
-    NewLang=lang(Base,New,Const,Func,Prop,Pred),
-    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+add_constrs(ModName,loc,Constrs) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(LBase,LConstr,LConst,LFunc,LProp,LPred),
+    ELang=lang(_,EConstr,_,_,_,_),
+    append(LConstr,Constrs,New),
+    append(New,EConstr,All),
+    is_set(All), !,
+    NewLang=lang(LBase,New,LConst,LFunc,LProp,LPred),
+    assert(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,NewLang,LCont,Stmnt))).
+add_constrs(ModName,exp,Constrs) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(_,LConstr,_,_,_,_),
+    ELang=lang(EBase,EConstr,EConst,EFunc,EProp,EPred),
+    append(EConstr,Constrs,New),
+    append(New,LConstr,All),
+    is_set(All), !,
+    NewLang=lang(EBase,New,EConst,EFunc,EProp,EPred),
+    assert(ast(ModName,exp(EImp,NewLang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))).
+add_constrs(ModName,_,_) :- format('Constructor double declared in module: ~w~n',[ModName]), fail.
 
-add_consts(ModName,Consts) :-
-    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
-    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
-    append(Const,Consts,New),
-    NewLang=lang(Base,Constr,New,Func,Prop,Pred),
-    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+add_consts(ModName,loc,Consts) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(LBase,LConstr,LConst,LFunc,LProp,LPred),
+    ELang=lang(_,_,EConst,_,_,_),
+    append(LConst,Consts,New),
+    append(New,EConst,All),
+    match_consts(All), !,
+    NewLang=lang(LBase,LConstr,New,LFunc,LProp,LPred),
+    assert(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,NewLang,LCont,Stmnt))).
+add_consts(ModName,exp,Consts) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(_,_,LConst,_,_,_),
+    ELang=lang(EBase,EConstr,EConst,EFunc,EProp,EPred),
+    append(EConst,Consts,New),
+    append(New,LConst,All),
+    match_consts(All), !,
+    NewLang=lang(EBase,EConstr,New,EFunc,EProp,EPred),
+    assert(ast(ModName,exp(EImp,NewLang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))).
+add_consts(ModName,_,_) :- format('Constant double declared in module: ~w~n',[ModName]), fail.
 
-add_funcs(ModName,Funcs) :-
-    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
-    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
-    append(Func,Funcs,New),
-    NewLang=lang(Base,Constr,Const,New,Prop,Pred),
-    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+add_funcs(ModName,loc,Funcs) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(LBase,LConstr,LConst,LFunc,LProp,LPred),
+    ELang=lang(_,_,_,EFunc,_,_),
+    append(LFunc,Funcs,New),
+    append(New,EFunc,All),
+    match_funcs(All), !,
+    NewLang=lang(LBase,LConstr,LConst,New,LProp,LPred),
+    assert(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,NewLang,LCont,Stmnt))).
+add_funcs(ModName,exp,Funcs) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(_,_,_,LFunc,_,_),
+    ELang=lang(EBase,EConstr,EConst,EFunc,EProp,EPred),
+    append(EFunc,Funcs,New),
+    append(New,LFunc,All),
+    match_funcs(All), !,
+    NewLang=lang(EBase,EConstr,EConst,New,EProp,EPred),
+    assert(ast(ModName,exp(EImp,NewLang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))).
+add_funcs(ModName,_,_) :- format('Function double declared in module: ~w~n',[ModName]), fail.
 
-add_props(ModName,Props) :-
-    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
-    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
-    append(Prop,Props,New),
-    NewLang=lang(Base,Constr,Const,Func,New,Pred),
-    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+add_props(ModName,loc,Props) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(LBase,LConstr,LConst,LFunc,LProp,LPred),
+    ELang=lang(_,_,_,_,EProp,_),
+    append(LProp,Props,New),
+    append(New,EProp,All),
+    is_set(All), !,
+    NewLang=lang(LBase,LConstr,LConst,LFunc,New,LPred),
+    assert(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,NewLang,LCont,Stmnt))).
+add_props(ModName,exp,Props) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(_,_,_,_,LProp,_),
+    ELang=lang(EBase,EConstr,EConst,EFunc,EProp,EPred),
+    append(EProp,Props,New),
+    append(New,LProp,All),
+    is_set(All), !,
+    NewLang=lang(EBase,EConstr,EConst,EFunc,New,EPred),
+    assert(ast(ModName,exp(EImp,NewLang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))).
+add_props(ModName,_,_) :- format('Proposition double declared in module: ~w~n',[ModName]), fail.
 
-add_preds(ModName,Preds) :-
-    retract(ast(ModName,Exp,loc(Imp,Lift,Lang,Cont,Stmnt))),
-    Lang=lang(Base,Constr,Const,Func,Prop,Pred),
-    append(Pred,Preds,New),
-    NewLang=lang(Base,Constr,Const,Func,Prop,New),
-    assert(ast(ModName,Exp,loc(Imp,Lift,NewLang,Cont,Stmnt))).
+add_preds(ModName,loc,Preds) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(LBase,LConstr,LConst,LFunc,LProp,LPred),
+    ELang=lang(_,_,_,_,_,EPred),
+    append(LPred,Preds,New),
+    append(New,EPred,All),
+    match_preds(All), !,
+    NewLang=lang(LBase,LConstr,LConst,LFunc,LProp,New),
+    assert(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,NewLang,LCont,Stmnt))).
+add_preds(ModName,exp,Preds) :-
+    retract(ast(ModName,exp(EImp,ELang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))),
+    LLang=lang(_,_,_,_,_,LPred),
+    ELang=lang(EBase,EConstr,EConst,EFunc,EProp,EPred),
+    append(EPred,Preds,New),
+    append(New,LPred,All),
+    match_preds(All), !,
+    NewLang=lang(EBase,EConstr,EConst,EFunc,EProp,New),
+    assert(ast(ModName,exp(EImp,NewLang,ECont),loc(LImp,Lift,LLang,LCont,Stmnt))).
+add_preds(ModName,_,_) :- format('Predicate double declared in module: ~w~n',[ModName]), fail.
+
+% Match Lists
+
+match_consts([]) :- !.
+match_consts([const(Name,_)|T]) :-
+    \+member(const(Name,_),T),
+    match_consts(T).
+
+match_funcs([]) :- !.
+match_funcs([func(Name,Arity,_,_,_,_)|T]) :-
+    \+member(func(Name,Arity,_,_,_,_),T),
+    match_funcs(T).
+
+match_preds([]) :- !.
+match_preds([pred(Name,Arity,_,_)|T]) :-
+    \+member(pred(Name,Arity,_,_),T),
+    match_preds(T).
 
 % Building Lists
 
