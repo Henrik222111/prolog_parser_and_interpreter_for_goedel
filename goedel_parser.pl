@@ -37,8 +37,13 @@ parse_file(File) :-
     close(Stream),
     reset, %trace,
     program(Txt,[]),
+    format('finished parsing '), print_line_count, format('~n'), !,
     check_types,
-    format('finished parsing '), print_line_count, format('~n'), !.
+    reset_stm,
+    extract_statements,
+    format('Start Lifting'), nl,
+    lift_pp,
+    format('Finished Lifting'), nl.
 parse_file(_File) :-
     (checked('type error') -> fail; format('failed parsing '), print_line_count, format('~n')),
     fail.
@@ -513,10 +518,10 @@ formula_1(all(Vars,Form)) --> "ALL", optws, "[", optws, variable_seq(Vars), optw
     formula_1_end(Form), optws.
 formula_1_end(Form) --> formula_1(Form).
 formula_1_end(Form) --> formula_0(Form).
-formula_2(Form) --> formula_1(Form1), !, optws, formula_2_mid(Form1,Form), optws.
-formula_2(Form) --> formula_0(Form1), !, optws, formula_2_mid(Form1,Form), optws.
 formula_2(Form) --> "IF", optws, formula_2_mid(If), optws, "THEN", optws,
     then_part(Then), formula_2_else(If,Then,Form).
+formula_2(Form) --> formula_1(Form1), !, optws, formula_2_mid(Form1,Form), optws.
+formula_2(Form) --> formula_0(Form1), !, optws, formula_2_mid(Form1,Form), optws.
 formula_2_mid(Form1,Form) --> "&", optws, formula_2_and(Form1,Form).
 formula_2_and(Form1,Form) --> formula_1(Form2), optws, formula_2_mid(and(Form1,Form2),Form), !.
 formula_2_and(Form1,Form) --> formula_0(Form2), optws, formula_2_mid(and(Form1,Form2),Form), !.
@@ -775,12 +780,12 @@ check(pred(Name,Arity,Terms),predicate) --> !, check_terms(Terms,Types),
     }.
 check(prop(Name),predicate) --> !,
     {acc_prop(Name) -> true
-     ; (write('Could not finnd Proposition: '), print_quoted(prop(Name)), nl, fail_checked)
+     ; (write('Could not find Proposition: '), print_quoted(prop(Name)), nl, fail_checked)
     }.
 check(some(_Vars,Expr),predicate) --> !, check(Expr,predicate).
 check(all(_Vars,Expr),predicate) --> !, check(Expr,predicate).
-check(if(A,B,C),predicate) --> check(A,predicate), check(B,predicate), check(C,predicate).
-check(if(A,B), predicate) --> check(A,predicate), check(B,predicate).
+check(if(A,B,C),predicate) --> !, check(A,predicate), check(B,predicate), check(C,predicate).
+check(if(A,B), predicate) --> !, check(A,predicate), check(B,predicate).
 check(Expr,T,Env,_) :- nonvar(T), !, format('Type error: ~w  (Expected: ~w, Env: ~w)~n',[Expr,T,Env]),
     fail_checked.
 check(Expr,_,Env,_) :- format('Illegal expression: ~w  (Env: ~w)~n',[Expr,Env]), fail_checked.
@@ -791,7 +796,7 @@ check_head(pred(Name,Arity,Terms)) --> !,
     check_terms(Terms,Types).
 check_head(prop(Name)) --> !,
     {get_prop(Name) -> true
-     ; (write('Could not finnd Proposition: '), print_quoted(prop(Name)), nl, fail_checked)
+     ; (write('Could not find Proposition: '), print_quoted(prop(Name)), nl, fail_checked)
     }.
 check_head(Expr) --> {format('Illegal head expression: ~w~n',[Expr]), fail_checked}.
 check_terms([],[]) --> !, [].
@@ -1008,6 +1013,135 @@ param_var(Name,X,[sub(N,Y)|T1],[sub(N,Y)|T2]) :-
     ).
 
 
+/* ----------- */
+/* Interpreter */
+/* ----------- */
+
+:- dynamic main/1.
+set_main(Name) :-
+    retractall(main(_)),
+    assert(main(Name)).
+
+goal(Goal) :-
+    string_codes(Goal,Codes),
+    goal(Form,Codes,[]),
+    main(Main),
+    reset_checked,
+    set_curr(Main,loc), % Goal must be in language of main module (loc has access to loc and exp)
+    check(Form,predicate,[],_),
+    retractall(curr(_,_)),
+    (checked('no type errors') -> true; fail),
+    interprete(Form).
+goal(Form) --> "<-", optws, goal_end(Form).
+goal_end(Form) --> ":", optws, body(Form).
+goal_end(Form) --> variable_seq(_Vars), optws, ":", optws, body(Form).
+goal_end(Form) --> body(Form).
+interprete(Form) :-
+    mkng(Form,Goal,[],Vars),
+    format('Goal is:~n'),
+    portray_clause(Goal),
+    format('Result is:~n'),
+    call(Goal),
+    print_vars(Vars).
+print_vars([]) :- !.
+print_vars([sub(Name,_Value)|T]) :-
+    atom_concat('_',_,Name), !,
+    print_vars(T).
+print_vars([sub(Name,Value)|T]) :-
+    print_quoted(Name), write(' = '), print_quoted(Value), format(',~n'),
+    print_vars(T).
+
+:-dynamic stm/2.
+reset_stm :- retractall(stm(_,_)).
+
+extract_statements :-
+    ast(_ModName,_,loc(_,_,_,_,Statements)),
+    extract_statements(Statements),
+    fail.
+extract_statements.
+extract_statements([]) :- !.
+extract_statements([stm(Head,Body)|T]) :-
+    assert(stm(Head,Body)),
+    extract_statements(T).
+
+
+
+% An adaption of "Lifting Code" from Michael Leuschel:
+% demo on how to lift and pretty-print statements
+lift_pp :-
+    stm(Head,Body),
+    mkng(Head,NVHead,[],Sub),
+    mkng(Body,NVBody,Sub,_),
+    portray_clause((NVHead :- NVBody)),nl,
+    assert((NVHead :- NVBody)),
+    fail.
+lift_pp.
+
+% an adaption of InstanceDemo from Michael Leuschel's script for "Vertiefung Logische Programmierung"
+
+mkng(vars([]),[]) --> [].
+mkng(vars([H|T]),[IH|IT]) -->
+    lookup_var(H,IH),
+    mkng(vars(T),IT).
+mkng(some(Vars,Form),LiftForm) -->
+    mkng(vars(Vars),_LiftVars),
+    mkng(Form,LiftForm).
+% Not Working
+mkng(all(Vars,Form),LiftForm) -->
+    mkng(vars(Vars),_LiftVars),
+    mkng(Form,LiftForm).
+mkng(if(If,Then),(LiftIf -> LiftThen)) -->
+    mkng(If,LiftIf),
+    mkng(Then,LiftThen).
+mkng(if(If,Then,Else),(LiftIf -> LiftThen ; LiftElse)) -->
+    mkng(If,LiftIf),
+    mkng(Then,LiftThen),
+    mkng(Else,LiftElse).
+mkng(rlImpl(A,B),(LiftB -> LiftA)) -->
+    mkng(A,LiftA),
+    mkng(B,LiftB).
+mkng(lrImpl(A,B),(LiftA -> LiftB)) -->
+    mkng(A,LiftA),
+    mkng(B,LiftB).
+mkng(equi(A,B),(LiftA == LiftB)) -->
+    mkng(A,LiftA),
+    mkng(B,LiftB).
+mkng(not(T),\+(LiftT)) --> mkng(T,LiftT).
+mkng(eq(A,B),(LiftA = LiftB)) -->
+    mkng(A,LiftA),
+    mkng(B,LiftB).
+mkng(fl(F),F) --> [].
+mkng(nr(N),N) --> [].
+mkng(str(S),S) --> [].
+mkng(true,true) --> [].
+mkng(false,false) --> [].
+mkng(prop(X),X) --> [].
+mkng(const(C),C) --> [].
+mkng(var(N),X) -->
+	lookup_var(N,X).
+mkng(pred(F,Arity,Args),Term) -->
+    mkng(func(F,Arity,Args),Term).
+mkng(func(F,_,Args),Term) -->
+	l_mkng(Args,IArgs),
+	{Term =.. [F|IArgs]}.
+mkng(and(A,B),(LiftA,LiftB)) -->
+    mkng(A,LiftA),
+    mkng(B,LiftB).
+mkng(or(A,B),(LiftA ; LiftB)) -->
+    mkng(A,LiftA),
+    mkng(B,LiftB).
+
+l_mkng([],[],Sub,Sub).
+l_mkng([H|T],[IH|IT],InSub,OutSub) :-
+	mkng(H,IH,InSub,IntSub),
+	l_mkng(T,IT,IntSub,OutSub).
+
+lookup_var(N,X,[],[sub(N,X)]) :- !.
+lookup_var(N,X,[sub(M,Y)|T],[sub(M,Y)|T1]) :-
+   (M==N -> X=Y, T1=T
+    ; lookup_var(N,X,T,T1)).
+
+
 /* ----------------- */
 /* helper predicates */
 /* ----------------- */
@@ -1030,7 +1164,9 @@ add_module(ModName) :-
     Exp=exp([],Lang,[]),
     % loc(imp,lift,lang,cont,stmnt)
     Loc=loc([],[],Lang,[],[]),
-    assert(ast(ModName,Exp,Loc)).
+    assert(ast(ModName,Exp,Loc)),
+    % Parser can only handle 1 module, that allows setting main module here
+    set_main(ModName).
 
 % Adding items to AST
 
