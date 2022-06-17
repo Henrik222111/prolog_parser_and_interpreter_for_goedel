@@ -574,8 +574,7 @@ then_part_if(if(If,Then)) --> "IF", optws, formula_f(If), optws,
     "THEN", optws , then_part(Then), optws.
 then_part_nif(Form) --> formula_1(Form1), !, optws, then_part_mid(Form1,Form), optws.
 then_part_nif(Form) --> formula_0(Form1), ! ,optws, then_part_mid(Form1,Form), optws.
-then_part_nif(Form) --> formula_1(Form), !, optws.
-then_part_nif(Form) --> formula_0(Form), optws.
+then_part_nif(Form) --> then_part_end(Form), optws.
 then_part_mid(Form1,Form) --> "&", optws, then_part_and(Form1,Form).
 then_part_and(Form1,Form) --> formula_1(Form2), optws, then_part_mid(and(Form1,Form2),Form), !.
 then_part_and(Form1,Form) --> formula_0(Form2), optws, then_part_mid(and(Form1,Form2),Form), !.
