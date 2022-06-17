@@ -490,12 +490,12 @@ cformula_2(Form) --> formula_1(Form1), !, optws, cformula_2_mid(Form1,Form).
 cformula_2(Form) --> formula_0(Form1), optws, cformula_2_mid(Form1,Form).
 cformula_2_mid(Form1,Form) --> "&", optws, cformula_2_and(Form1,Form).
 cformula_2_and(Form1,Form) --> cformula_0(Form2), optws, cformula_2_mid(and(Form1,Form2),Form), !.
-cformula_2_and(Form1,Form) --> formula_2(Form2), optws, cformula_2_mid(and(Form1,Form2),Form), !.
+cformula_2_and(Form1,Form) --> formula_2_if(Form2), optws, cformula_2_mid(and(Form1,Form2),Form), !.
 cformula_2_and(Form1,Form) --> formula_1(Form2), optws, cformula_2_mid(and(Form1,Form2),Form), !.
 cformula_2_and(Form1,Form) --> formula_0(Form2), optws, cformula_2_mid(and(Form1,Form2),Form), !.
 cformula_2_and(Form1,Form) --> cformula_2_end(Form2), {Form=and(Form1,Form2)}.
 cformula_2_end(Form) --> cformula_0(Form), !.
-cformula_2_end(Form) --> formula_2(Form), !. % "&" is filtered
+cformula_2_end(Form) --> formula_2_if(Form), !. % "&" is filtered
 cformula_2_end(Form) --> formula_1(Form), !.
 cformula_2_end(Form) --> formula_0(Form).
 cformula_f(Form) --> formula_4(Form), !.
@@ -518,15 +518,17 @@ formula_1(all(Vars,Form)) --> "ALL", optws, "[", optws, variable_seq(Vars), optw
     formula_1_end(Form), optws.
 formula_1_end(Form) --> formula_1(Form).
 formula_1_end(Form) --> formula_0(Form).
-formula_2(Form) --> "IF", optws, formula_2_mid(If), optws, "THEN", optws,
+formula_2(Form) --> formula_2_if(Form), !.
+formula_2(Form) --> formula_2_nif(Form).
+formula_2_if(Form) --> "IF", optws, formula_2_mid(If), optws, "THEN", optws,
     then_part(Then), formula_2_else(If,Then,Form).
-formula_2(Form) --> formula_1(Form1), !, optws, formula_2_mid(Form1,Form), optws.
-formula_2(Form) --> formula_0(Form1), !, optws, formula_2_mid(Form1,Form), optws.
+formula_2_nif(Form) --> formula_1(Form1), !, optws, formula_2_mid(Form1,Form), optws.
+formula_2_nif(Form) --> formula_0(Form1), optws, formula_2_mid(Form1,Form), optws.
 formula_2_mid(Form1,Form) --> "&", optws, formula_2_and(Form1,Form).
 formula_2_and(Form1,Form) --> formula_1(Form2), optws, formula_2_mid(and(Form1,Form2),Form), !.
 formula_2_and(Form1,Form) --> formula_0(Form2), optws, formula_2_mid(and(Form1,Form2),Form), !.
-formula_2_and(Form1,Form) --> formula_2_end(Form2), {Form=and(Form1,Form2)}. % "&" is filtered
-formula_2_end(Form) --> formula_2(Form), !.
+formula_2_and(Form1,Form) --> formula_2_end(Form2), {Form=and(Form1,Form2)}.
+formula_2_end(Form) --> formula_2_if(Form), !. % "&" is filtered
 formula_2_end(Form) --> formula_1(Form), !.
 formula_2_end(Form) --> formula_0(Form).
 formula_2_mid(some(Vars,Form)) --> "SOME", !, optws, "[", optws, variable_seq(Vars), optws, "]",
@@ -566,11 +568,21 @@ formula_4_end(Form) --> formula_3(Form), !.
 formula_4_end(Form) --> formula_2(Form), !.
 formula_4_end(Form) --> formula_1(Form), !.
 formula_4_end(Form) --> formula_0(Form).
-then_part(if(If,Then)) --> "IF", !, optws, formula_f(If), optws, "THEN", optws , then_part(Then), optws.
-then_part(Form) --> formula_1(Form1), !, optws, then_part_end(Form1,Form), optws.
-then_part(Form) --> formula_0(Form1), optws, then_part_end(Form1,Form), optws.
-then_part_end(Form1,and(Form1,Form2)) --> "&", !, optws, then_part(Form2).
-then_part_end(Form1,Form) --> {Form=Form1}.
+then_part(Form) --> then_part_if(Form), !.
+then_part(Form) --> then_part_nif(Form).
+then_part_if(if(If,Then)) --> "IF", optws, formula_f(If), optws,
+    "THEN", optws , then_part(Then), optws.
+then_part_nif(Form) --> formula_1(Form1), !, optws, then_part_mid(Form1,Form), optws.
+then_part_nif(Form) --> formula_0(Form1), ! ,optws, then_part_mid(Form1,Form), optws.
+then_part_nif(Form) --> formula_1(Form), !, optws.
+then_part_nif(Form) --> formula_0(Form), optws.
+then_part_mid(Form1,Form) --> "&", optws, then_part_and(Form1,Form).
+then_part_and(Form1,Form) --> formula_1(Form2), optws, then_part_mid(and(Form1,Form2),Form), !.
+then_part_and(Form1,Form) --> formula_0(Form2), optws, then_part_mid(and(Form1,Form2),Form), !.
+then_part_and(Form1,Form) --> then_part_end(Form2), {Form=and(Form1,Form2)}.
+then_part_end(Form) --> then_part_if(Form), !.
+then_part_end(Form) --> formula_1(Form), !.
+then_part_end(Form) --> formula_0(Form).
 goedel_atom(not(eq(Term1,Term2))) --> term(Term1), "~=", !, term(Term2).
 goedel_atom(eq(Term1,Term2)) --> term(Term1), "=", !, term(Term2).
 goedel_atom(true) --> "True", !.
