@@ -715,7 +715,11 @@ check_preds([]) :- !.
 check_preds([pred(_,_,_,Types)|T]) :- check_terms(Types,_,[],_), check_preds(T).
 check_contrls(Contrls) :- check_contrls(Contrls,[]).
 check_contrls([],_) :- !.
-check_contrls([delay(pred(Name,Arity,Types),Cond)|T],I) :-
+check_contrls([delay(Atom,Cond)|T],I) :-
+    (Atom=pred(Name,Arity,Types) -> true
+     ; ( write('Atom in delay condition must a predicate: '), print_quoted(pred(Name,Arity,Types)),
+         nl, fail_checked)
+    ),
     check(pred(Name,Arity,Types),predicate,[],Vars1),
     check(Cond,predicate,[],Vars2),
     acc_pred_nimp(Name,Arity), % Delay must be in same module as declaration
