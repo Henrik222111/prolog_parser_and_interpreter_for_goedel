@@ -718,10 +718,11 @@ check_contrls([],_) :- !.
 check_contrls([delay(pred(Name,Arity,Types),Cond)|T],I) :-
     check(pred(Name,Arity,Types),predicate,[],Vars1),
     check(Cond,predicate,[],Vars2),
+    acc_pred_nimp(Name,Arity), % Delay must be in same module as declaration
     (containing(Vars2,Vars1) -> true
      ; ( write('Variables in delay condition must apear in Atom: '), print_quoted(pred(Name,Arity,Types)),
-          nl, fail_checked)
-    ),print_quoted(Types),nl,
+         nl, fail_checked)
+    ),
     lift_vars(Types,ITypes,[],_),
     (\+member(pred(Name,Arity,ITypes),I) -> true
      ; ( write('Delays cant have common instance: '), print_quoted(pred(Name,Arity,Types)),
@@ -1010,6 +1011,19 @@ imp_acc_pred([H|T],Func) :-
     (exp_acc_pred(H,Func) -> (true, !)
      ; imp_acc_pred(T,Func)
     ).
+% used to check control declarations
+acc_pred_nimp(Name,Arity):-
+    curr(ModName,Part),
+    (Part=exp -> exp_acc_pred_nimp(ModName,pred(Name,Arity,_Spec,_PTypes))
+     ; loc_acc_pred_nimp(ModName,pred(Name,Arity,_Spec,_PTypes))
+    ).
+exp_acc_pred_nimp(ModName,Pred) :-
+    ast(ModName,exp(_,lang(_,_,_,_,_,EPred),_),_),
+    member(Pred,EPred), !.
+loc_acc_pred_nimp(ModName,Pred) :-
+    ast(ModName,exp(_,lang(_,_,_,_,_,EPred),_),loc(_,_,lang(_,_,_,_,_,LPred),_,_)),
+    append(LPred,EPred,Preds),
+    member(Pred,Preds), !.
 
 % par(Name) must be lifted to prolog variable
 % variable can than be unified with bases/constructors
