@@ -655,6 +655,7 @@ fail_checked :-
     fail.
 
 check_types :-
+    reset_checked,
     reset_curr,
     check_routine,
     (checked('no type errors') -> true; fail).
