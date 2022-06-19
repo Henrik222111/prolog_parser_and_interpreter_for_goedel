@@ -727,7 +727,7 @@ check_contrls([delay(Atom,Cond)|T],I) :-
      ; ( write('Variables in delay condition must apear in Atom: '), print_quoted(pred(Name,Arity,Types)),
          nl, fail_checked)
     ),
-    lift_vars(Types,ITypes,[],_),
+    l_mkng(Types,ITypes,[],_),
     (\+member(pred(Name,Arity,ITypes),I) -> true
      ; ( write('Delays cant have common instance: '), print_quoted(pred(Name,Arity,Types)),
           nl, fail_checked)
@@ -738,16 +738,6 @@ check_stms([H|T]) :- check(H,stm), check_stms(T).
 
 containing([],_) :- !.
 containing([H|T],L) :- member(H,L), containing(T,L).
-% var(Name,Type) must be lifted to prolog variable
-lift_vars([],[]) --> !, [].
-lift_vars([H|T],[IH|IT]) --> !, lift_vars(H,IH), lift_vars(T,IT).
-lift_vars(var(Name),X) --> !, var_var(Name,X).
-lift_vars(X,X) --> !, [].
-var_var(Name,X,[],[sub(Name,X)]) :- !.
-var_var(Name,X,[sub(N,Y)|T1],[sub(N,Y)|T2]) :-
-    (Name==N -> (X=Y, T1=T2)
-     ; var_var(Name,X,T1,T2)
-    ).
 
 % An adaption of "A small demo of Hindley Milner Type Inference using
 % Unification" from Michael Leuschel
