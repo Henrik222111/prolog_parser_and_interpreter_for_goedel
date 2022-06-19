@@ -769,7 +769,10 @@ check(grnd(Name),predicate) --> defined(var(Name,_)), !.
 check(grnd(Name),predicate) --> !, add(var(Name,_)).
 % checking statements
 check(stm(Head,Body),stm) --> !, check_head(Head), check(Body,predicate).
-check(var(Var),TVar) --> defined(var(Var,Type)), !, {TVar=Type}.
+check(var(Var),TVar) --> defined(var(Var,Type)), !,
+    {TVar=Type -> true
+     ; (write('Variable cant have 2 types: '), print_quoted(var(Var,TVar,Type)), nl, fail_checked)
+    }.
 check(var(Var),TVar) --> !, add(var(Var,TVar)). % creates fresh variable
 check(fl(_Fl),'Float') --> !, [].
 check(nr(_Nr),'Integer') --> !, [].
