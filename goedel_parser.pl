@@ -774,9 +774,9 @@ check(var(Var),TVar) --> defined(var(Var,Type)), !,
      ; (write('Variable cant have 2 types: '), print_quoted(var(Var,TVar,Type)), nl, fail_checked)
     }.
 check(var(Var),TVar) --> !, add(var(Var,TVar)). % creates fresh variable
-check(fl(_Fl),'Float') --> !, [].
-check(nr(_Nr),'Integer') --> !, [].
-check(str(_Str),'Sring') --> !, [].
+check(fl(_Fl),base('Float')) --> !, [].
+check(nr(_Nr),base('Integer')) --> !, [].
+check(str(_Str),base('String')) --> !, [].
 check(func(Name,Arity,Terms),T) --> !, check_terms(Terms,Types),
     {acc_func(Name,Arity,Types,T) -> true
      ; (write('Could not find Function: '), print_quoted(func(Name,Arity,Types,T)), nl, fail_checked)
@@ -833,6 +833,7 @@ check(Expr,Result) :- check(Expr,Result,[],Env), write('Typing env: '), portray_
 /* --------------- */
 
 % Base is Name
+acc_base(Base) :- member(Base,['Float','Integer','String']).
 acc_base(Base) :-
     curr(ModName,Part),
     (Part=non -> fail; true),
