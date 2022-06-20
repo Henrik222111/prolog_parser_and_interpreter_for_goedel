@@ -936,8 +936,7 @@ get_prop(Prop) :-
     ast(ModName,exp(_,lang(_,_,_,_,EProp,_),_),loc(_,_,lang(_,_,_,_,LProp,_),_,_)),
     (member(Prop,EProp) -> true
       ; member(Prop,LProp)
-    ),
-    curr(_,_). % Failing if both member failed
+    ).
 acc_prop(Prop) :-
     curr(ModName,Part),
     (Part=exp -> exp_acc_prop(ModName,Prop)
