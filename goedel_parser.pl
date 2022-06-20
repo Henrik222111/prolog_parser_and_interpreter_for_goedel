@@ -1,10 +1,7 @@
 % author: Henrik Hinzmann
 
-% TODOs
-% integer and float constant is treated specially (const_decl)
-% func_decl declaration must be transparent
-
 % Can be done later
+% integer and float constant is treated specially (const_decl)
 % range_formula
 % list
 % set
@@ -35,7 +32,7 @@ parse_file(File) :-
     set_input(Stream),
     read_file(Txt),
     close(Stream),
-    reset, %trace,
+    reset,
     program(Txt,[]),
     format('finished parsing '), print_line_count, format('~n'), !,
     check_types,
@@ -381,7 +378,7 @@ opt_const_decl(Consts) --> semicolon, !, optws, const_decl(Consts1), optws, opt_
 opt_const_decl(Consts) --> {Consts=[]}.
 const_decl(Consts) --> user_name_seq(Names), ":", optws, type(Type), optws,
     {const_list(Names,Type,Consts)}.
-% integer and float constant is treated specially %%TODO
+% integer and float constant is treated specially %% can be done later
 % List of func(Name,Arity,Spec,Prio,List of Types,Rangetype)
 function_decl(Funcs) --> "FUNCTION", !, ws, func_decl(Funcs1), optws, opt_func_decls(Funcs2),
     {append(Funcs1,Funcs2,Funcs)}.
@@ -675,7 +672,6 @@ check_routine :-
     check_funcs(LFunc),
     check_preds(LPred),
     check_contrls(LContrl),
-    set_curr(ModName,non),
     check_stms(Stms),
     retractall(curr(_,_)),
     format('Finished type checking~n~n'),
@@ -826,7 +822,6 @@ check(Expr,Result) :- check(Expr,Result,[],Env), write('Typing env: '), portray_
 acc_base(Base) :- member(Base,['Float','Integer','String']).
 acc_base(Base) :-
     curr(ModName,Part),
-    (Part=non -> fail; true),
     (Part=exp -> exp_acc_base(ModName,Base)
      ; loc_acc_base(ModName,Base)
     ).
@@ -853,7 +848,6 @@ imp_acc_base([H|T],Base) :-
 % Constr is constr(Name,Arity)
 acc_constr(Name,Arity) :-
     curr(ModName,Part),
-    (Part=non -> fail; true),
     (Part=exp -> exp_acc_constr(ModName,constr(Name,Arity))
      ; loc_acc_constr(ModName,constr(Name,Arity))
     ).
@@ -880,7 +874,6 @@ imp_acc_constr([H|T],Constr) :-
 % Const is Name
 acc_const(Const,T) :-
     curr(ModName,Part),
-    (Part=non -> fail; true),
     (Part=exp -> exp_acc_const(ModName,const(Const,PT))
      ; loc_acc_const(ModName,const(Const,PT))
     ),
@@ -910,7 +903,6 @@ imp_acc_const([H|T],Const) :-
 % Func is func(Name,Arity,Specifier,Prio,Types,RangeType)
 acc_func(Name,Arity,Types,T) :-
     curr(ModName,Part),
-    (Part=non -> fail; true),
     (Part=exp -> exp_acc_func(ModName,func(Name,Arity,_Spec,_Prio,PTypes,PT))
      ; loc_acc_func(ModName,func(Name,Arity,_Spec,_Prio,PTypes,PT))
     ),
@@ -940,14 +932,14 @@ imp_acc_func([H|T],Func) :-
 
 % Prop is Name
 get_prop(Prop) :-
-    retract(curr(ModName,_)),
+    curr(ModName,_),
     ast(ModName,exp(_,lang(_,_,_,_,EProp,_),_),loc(_,_,lang(_,_,_,_,LProp,_),_,_)),
-    (member(Prop,EProp) -> assert(curr(ModName,exp)); true),
-    (member(Prop,LProp) -> assert(curr(ModName,loc)); true),
+    (member(Prop,EProp) -> true
+      ; member(Prop,LProp)
+    ),
     curr(_,_). % Failing if both member failed
 acc_prop(Prop) :-
     curr(ModName,Part),
-    (Part=non -> fail; true),
     (Part=exp -> exp_acc_prop(ModName,Prop)
      ; loc_acc_prop(ModName,Prop)
     ).
@@ -975,16 +967,15 @@ imp_acc_prop([H|T],Prop) :-
 % Pred is pred(Name,Arity,Specifier,Types)
 
 get_pred(Name,Arity,Types) :-
-    retract(curr(ModName,_)),
+    curr(ModName,_),
     ast(ModName,exp(_,lang(_,_,_,_,_,EPred),_),loc(_,_,lang(_,_,_,_,_,LPred),_,_)),
-    (member(pred(Name,Arity,_Spec1,PTypes),EPred) -> assert(curr(ModName,exp)); true),
-    (member(pred(Name,Arity,_Spec2,PTypes),LPred) -> assert(curr(ModName,loc)); true),
-    curr(_,_), % Failing if both member failed
+    (member(pred(Name,Arity,_Spec1,PTypes),EPred) -> true
+      ;  member(pred(Name,Arity,_Spec2,PTypes),LPred)
+    ),
     lift_params(PTypes,ITypes,[],_),
     ITypes=Types.
 acc_pred(Name,Arity,Types) :-
     curr(ModName,Part),
-    (Part=non -> fail; true),
     (Part=exp -> exp_acc_pred(ModName,pred(Name,Arity,_Spec,PTypes))
      ; loc_acc_pred(ModName,pred(Name,Arity,_Spec,PTypes))
     ),
